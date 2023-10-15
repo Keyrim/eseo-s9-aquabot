@@ -10,3 +10,9 @@ git clone https://github.com/osrf/vrx.git
 
 cd ~/vrx_ws
 colcon build --merge-install
+
+echo "source /opt/ros/humble/setup.bash" >> ~/.bashrc
+
+echo "alias abot_build='cd ~/vrx_ws && colcon build --merge-install'"
+echo "alias abot_source='source ~/vrx_ws/install/setup.bash'"
+echo "alias abot_code='code ~/vrx_ws/src/aquabot_competitor'"

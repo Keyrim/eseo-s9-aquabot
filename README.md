@@ -60,6 +60,7 @@ Clone this repository in`~/vrx_ws/src`
 ```bash
 cd ~/vrx_ws/src
 gh repo clone sirehna/Aquabot
+mv Aquabot aquabot
 ```
 
 ### 1.5 Add some examples (Optional)
@@ -71,6 +72,7 @@ Clone this repository in`~/vrx_ws/src`
 ```bash
 cd ~/vrx_ws/src
 gh repo clone sirehna/Aquabot-Competitor
+mv Aquabot-Competitor aquabot_competitor
 ```
 
 Everyhting is now installed, we can start a simulation.
