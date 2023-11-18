@@ -5,10 +5,10 @@ import math
 from rclpy.node import Node
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
-from environment.threat_position_publisher import ThreatPositionPublisher
-from environment.buoy_position_publisher import BuoyPositionPublisher
-from environment.shared_types import SearchedObjectInfo
-from environment.shared_types import Source
+from src.threat_position_publisher import ThreatPositionPublisher
+from src.buoy_position_publisher import BuoyPositionPublisher
+from environment_interfaces.msg import SearchedObjectInfo
+from src.shared_types import Source
 
 
 class FoundElement:
@@ -42,8 +42,8 @@ class ImageSubscriber(Node):
         self.buoy_position_publisher = buoy_position_publisher
 
     def threat_tracker(self, msg: Image):
-        fov_deg = 120  # TODO à modifier en fonction de la caméra
-        # Le Y de la menace est toujours supérieur à cette valeur
+        fov_deg = 80  # FOV de la caméra
+        # Le Y de la menace est toujours supérieur à cette valeur (pour ne pas capter les arbres en hauteur)
         y_threat_threshold = 170
         # TODO à modifier en fonction de la taille de la menace à longue distance
         area_threshold = 1
@@ -59,7 +59,8 @@ class ImageSubscriber(Node):
 
         # Filtrer l'image pour obtenir uniquement les pixels rouges
         mask = cv2.inRange(image, lower_red, upper_red)
-        cv2.imshow("Masque Rouge", mask)
+        # cv2.imshow("Masque Rouge", mask) # DEBUG
+
         # Trouver les contours des objets rouges dans le range
         contours = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         contours = imutils.grab_contours(contours)
@@ -68,7 +69,7 @@ class ImageSubscriber(Node):
         found_elements = []
         for contour in contours:
             area = cv2.contourArea(contour)
-            print("Surface = ", area)
+            # print("Surface = ", area) # DEBUG
             if area > area_threshold:
                 # compute the center of the contour
                 M = cv2.moments(contour)
@@ -95,35 +96,34 @@ class ImageSubscriber(Node):
             )
             cv2.drawContours(image, [element.contour], -1, (0, 255, 0), 2)
             cv2.circle(image, (element.x, element.y), 3, (255, 255, 255), -1)
-            # cv2.putText(image, f"center : ({element.x};{element.y};{element.angle}°)", (element.x - 20, element.y - 20),
-            #     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+            # cv2.putText(image, f"center : ({element.x};{element.y};{element.angle}°)", (element.x - 20, element.y - 20), 
+            #     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2) # DEBUG
 
         if threat_element.area > 0:
             cv2.circle(image, (threat_element.x, threat_element.y), 3, (0, 0, 255), -1)
             cv2.putText(
                 image,
-                f"({threat_element.x};{threat_element.y};{threat_element.angle:.2f} deg)",
+                f"area : {threat_element.area} (X;Y) : ({threat_element.x};{threat_element.y}) theta_deg {threat_element.angle:.2f})",
                 (threat_element.x - 20, threat_element.y - 20),
                 cv2.FONT_HERSHEY_SIMPLEX,
-                0.5,
+                0.3,
                 (0, 0, 255),
                 2,
             )
 
-        threat_info = SearchedObjectInfo(
-            Source.CAMERA,
-            threat_element.area > 0,
-            math.radians(threat_element.angle),
-            0,
-        )
+        threat_info = SearchedObjectInfo()
+        threat_info.source = Source.CAMERA
+        threat_info.is_found = threat_element.area > 0
+        threat_info.angle = math.radians(threat_element.angle)
+        threat_info.distance = 0.0
         self.threat_position_publisher.publish_threat_position(threat_info)
         # Afficher l'image
-        cv2.imshow("Image from ROS 2", image)
+        cv2.imshow("Threat tracker CAMERA", image)
         cv2.waitKey(1)
 
     def buoy_tracker(self, msg: Image):
-        # TODO à implémenter
-        buoy_info = SearchedObjectInfo(Source.CAMERA, False, 0, 0)
+        buoy_info = SearchedObjectInfo()
+        # TODO set buoy_info fields
         self.buoy_position_publisher.publish_buoy_position(buoy_info)
 
     def listener_callback(self, msg):

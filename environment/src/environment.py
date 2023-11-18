@@ -1,7 +1,7 @@
 import rclpy
-from environment.image_subscriber import ImageSubscriber
-from environment.threat_position_publisher import ThreatPositionPublisher
-from environment.buoy_position_publisher import BuoyPositionPublisher
+from src.image_subscriber import ImageSubscriber
+from src.threat_position_publisher import ThreatPositionPublisher
+from src.buoy_position_publisher import BuoyPositionPublisher
 
 def main():
     rclpy.init()

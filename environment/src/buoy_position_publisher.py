@@ -1,5 +1,5 @@
 from rclpy.node import Node
-from shared_types import SearchedObjectInfo
+from environment_interfaces.msg import SearchedObjectInfo
 
 class BuoyPositionPublisher(Node):
     def __init__(self):
