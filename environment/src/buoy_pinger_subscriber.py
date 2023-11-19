@@ -1,10 +1,8 @@
-from std_msgs.msg import Float64
 from ros_gz_interfaces.msg import ParamVec
 from src.shared_types import Source
 from src.buoy_position_publisher import BuoyPositionPublisher
 from environment_interfaces.msg import BuoyInfo
 from rclpy.node import Node
-import numpy as np
 
 class BuoyPingerSubscriber(Node):
     def __init__(
@@ -18,7 +16,6 @@ class BuoyPingerSubscriber(Node):
             self.listener_callback,
             10,
         )
-        self.subscription  # prevent unused variable warning
         self.buoy_position_publisher = buoy_position_publisher
 
     def listener_callback(self, msg: ParamVec):

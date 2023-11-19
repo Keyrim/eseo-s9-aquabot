@@ -12,7 +12,7 @@ from environment_interfaces.msg import BuoyInfo
 from src.shared_types import Source
 
 
-class FoundElement:
+class CameraFoundElement:
     def __init__(
         self, c_x: int, c_y: int, angle: float, area: float, contour: np.ndarray
     ):
@@ -36,7 +36,6 @@ class ImageSubscriber(Node):
             self.listener_callback,
             10,
         )
-        self.subscription  # prevent unused variable warning
         #  Initialiser CvBridge pour convertir les images ROS en images OpenCV
         self.bridge = CvBridge()
         self.threat_position_publisher = threat_position_publisher
@@ -70,7 +69,7 @@ class ImageSubscriber(Node):
         found_elements = []
         for contour in contours:
             area = cv2.contourArea(contour)
-            # print("Surface = ", area) # DEBUG
+            # self.get_logger().info("Surface = ", area) # DEBUG
             if area > area_threshold:
                 # compute the center of the contour
                 M = cv2.moments(contour)
@@ -82,10 +81,10 @@ class ImageSubscriber(Node):
                     self.px_left_angle_deg
                     + ((self.px_right_angle_deg - self.px_left_angle_deg) / msg.width) * cX
                 )
-                found_elements.append(FoundElement(cX, cY, threat_angle, area, contour))
+                found_elements.append(CameraFoundElement(cX, cY, threat_angle, area, contour))
 
         # Trouver la menace parmi les éléments trouvés en se basant sur la surface et la position en Y
-        threat_element = FoundElement(0, 0, 0, 0, None)
+        threat_element = CameraFoundElement(0, 0, 0, 0, None)
         for element in found_elements:
             threat_element = (
                 element
@@ -144,7 +143,7 @@ class ImageSubscriber(Node):
         found_elements = []
         for contour in contours:
             area = cv2.contourArea(contour)
-            # print("Surface = ", area) # DEBUG
+            # self.get_logger().info("Surface = ", area) # DEBUG
             if area > area_threshold:
                 # compute the center of the contour
                 M = cv2.moments(contour)
@@ -155,10 +154,10 @@ class ImageSubscriber(Node):
                 buoy_angle_coef_from_center = (self.fov_deg)/math.sqrt(msg.width * msg.height)
                 center_x = msg.width/2
                 buoy_angle = buoy_angle_coef_from_center * (cX - center_x)
-                found_elements.append(FoundElement(cX, cY, buoy_angle, area, contour))
+                found_elements.append(CameraFoundElement(cX, cY, buoy_angle, area, contour))
 
         # Trouver la bouée parmi les éléments trouvés en se basant sur la surface et la position en Y
-        buoy_element = FoundElement(0, 0, 0, 0, None)
+        buoy_element = CameraFoundElement(0, 0, 0, 0, None)
         for element in found_elements:
             buoy_element = (
                 element
@@ -188,7 +187,7 @@ class ImageSubscriber(Node):
         buoy_info = BuoyInfo()
         buoy_info.source = Source.CAMERA
         buoy_info.is_found = buoy_element.area > 0
-        # print("angle", buoy_element.angle, "angle - 90", buoy_element.angle-90)
+        # self.get_logger().info("angle", buoy_element.angle, "angle - 90", buoy_element.angle-90)
 
         buoy_info.angle = math.radians(buoy_element.angle)
         buoy_info.distance = 0.0
