@@ -91,7 +91,10 @@ class Environment(Node):
         rclpy.shutdown()
         executor_thread.join()
 
-if __name__ == '__main__':
+def main(args=None):
     rclpy.init()
     env = Environment()
     env.run()
+
+if __name__ == '__main__':
+    main()
