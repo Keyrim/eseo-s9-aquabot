@@ -14,7 +14,10 @@ find_package(rosidl_default_generators REQUIRED)
 rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/LidarObject.msg"
   "msg/BuoyInfo.msg"
-  "msg/ThreatInfo.msg" # TODO: add more messages here
+  "msg/ThreatInfo.msg" 
+  "msg/BoatState.msg"
+  "msg/BoatTrajectory.msg"
+  # TODO: add more messages here
 )
 ############
 
