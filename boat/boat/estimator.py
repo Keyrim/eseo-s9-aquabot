@@ -2,6 +2,7 @@ import rclpy
 import math
 from rclpy.node import Node
 from sensor_msgs.msg import NavSatFix
+from environment_interfaces.msg import BoatState
 
 # Topics used by the estimator
 in_topic_gps = '/wamv/sensors/gps/gps/fix'
@@ -25,12 +26,11 @@ class Estimator(Node):
             10)
         self.subscription_gps  # prevent unused variable warning
         # Pubs
-        self.publisher_pos = self.create_publisher(NavSatFix, out_topic_pos, 10)
+        self.publisher_pos = self.create_publisher(BoatState, out_topic_pos, 10)
 
     def gps_callback(self, msg):
         latitude = msg.latitude
         longitude = msg.longitude
-        altitude = msg.altitude
 
         if self.base_lat is None and self.base_lon is None:
             self.base_lat, self.base_lon = latitude, longitude
@@ -38,11 +38,11 @@ class Estimator(Node):
         else:
             self.x, self.y = self.convert_gps_to_xy(latitude, longitude)
         # Affichage de la position en x et y avec 3 décimakes
-        # self.get_logger().info('x: %.3f, y: %.3f' % (self.x, self.y))
+        self.get_logger().info('x: %.3f, y: %.3f' % (self.x, self.y))
         # Publication de la position en x et y
-        msg = NavSatFix()
-        msg.latitude = self.x
-        msg.longitude = self.y
+        msg = BoatState()
+        msg.x = float(self.x)
+        msg.y = float(self.y)
         self.publisher_pos.publish(msg)
 
     def convert_gps_to_xy(self, latitude, longitude):
@@ -59,7 +59,7 @@ class Estimator(Node):
         y = math.sin(dLon) * math.cos(math.radians(latitude))
         x = math.cos(math.radians(self.base_lat)) * math.sin(math.radians(latitude)) - math.sin(math.radians(self.base_lat)) * math.cos(math.radians(latitude)) * math.cos(dLon)
         bearing = math.atan2(y, x)
-        y = distance * math.cos(bearing)
+        y = - distance * math.cos(bearing)
         x = distance * math.sin(bearing)
         return x, y
 
