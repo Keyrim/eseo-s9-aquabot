@@ -3,6 +3,7 @@ from src.shared_types import Source
 from src.buoy_position_publisher import BuoyPositionPublisher
 from environment_interfaces.msg import BuoyInfo
 from rclpy.node import Node
+import math
 
 class BuoyPingerSubscriber(Node):
     def __init__(
@@ -22,6 +23,14 @@ class BuoyPingerSubscriber(Node):
         buoy_info = BuoyInfo()
         buoy_info.source = Source.ACOUSTIC
         buoy_info.is_found = True
-        buoy_info.angle = msg.params[1].value.double_value
-        buoy_info.distance = msg.params[2].value.double_value
+
+        for param in msg.params:
+            name = param.name
+            if name == 'bearing':
+                buoy_info.angle = param.value.double_value
+            elif name == 'range':
+                buoy_info.distance = param.value.double_value
+
+        buoy_info.y = buoy_info.distance * math.cos(buoy_info.angle)
+        buoy_info.x = buoy_info.distance * math.sin(buoy_info.angle)
         self.buoy_position_publisher.publish_buoy_position(buoy_info)

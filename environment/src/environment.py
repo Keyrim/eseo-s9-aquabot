@@ -1,5 +1,6 @@
 import rclpy
 import threading
+from geometry_msgs.msg import Point
 from rclpy.node import Node
 from src.image_subscriber import ImageSubscriber
 from src.threat_position_publisher import ThreatPositionPublisher
@@ -11,6 +12,7 @@ from environment_interfaces.msg import BuoyInfo
 from environment_interfaces.msg import ThreatInfo
 from environment_interfaces.msg import LidarObject
 from sensor_msgs.msg import NavSatFix
+from src.shared_types import Source
 
 class Environment(Node):
     def __init__(self):
@@ -40,9 +42,30 @@ class Environment(Node):
             10,
         )
 
+        self.buoy_pos_publisher = self.create_publisher(
+            Point,
+            "/environment/buoy_pos",
+            10
+        )
+        # Class attributes
+        self.usv_x = 0
+        self.usv_y = 0
+        self.buoy_info_lidar = BuoyInfo()
+        self.buoy_info_pinger = BuoyInfo()
+
     def buoy_listener_callback(self, msg: BuoyInfo):
         self.get_logger().info("BuoyInfo received") # DEBUG
-        # TODO switch Source
+        if msg.source == Source.ACOUSTIC:
+            self.buoy_info_pinger.distance = msg.distance
+            self.buoy_info_pinger.angle = msg.angle
+            self.buoy_info_pinger.is_found = msg.is_found
+            #msg gives (x,y) as relative pos, add current USV (X;Y) to find buoy (X;Y) pos
+            self.buoy_info_pinger.x = msg.x + self.usv_x
+            self.buoy_info_pinger.y = msg.y + self.usv_y
+            buoy_pos = Point()
+            buoy_pos.x = self.buoy_info_pinger.x
+            buoy_pos.y = self.buoy_info_pinger.y
+            self.buoy_pos_publisher.publish(buoy_pos)
 
     def threat_listener_callback(self, msg: ThreatInfo):
         self.get_logger().info("ThreatInfo received") # DEBUG
