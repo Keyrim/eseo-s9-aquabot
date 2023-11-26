@@ -30,7 +30,4 @@ class BuoyPingerSubscriber(Node):
                 buoy_info.angle = param.value.double_value
             elif name == 'range':
                 buoy_info.distance = param.value.double_value
-
-        buoy_info.y = buoy_info.distance * math.cos(buoy_info.angle)
-        buoy_info.x = buoy_info.distance * math.sin(buoy_info.angle)
         self.buoy_position_publisher.publish_buoy_position(buoy_info)

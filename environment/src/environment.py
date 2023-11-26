@@ -1,4 +1,5 @@
 import rclpy
+import math
 import threading
 from geometry_msgs.msg import Point
 from rclpy.node import Node
@@ -11,7 +12,7 @@ from src.lidar_subscriber import LidarSubscriber
 from environment_interfaces.msg import BuoyInfo
 from environment_interfaces.msg import ThreatInfo
 from environment_interfaces.msg import LidarObject
-from sensor_msgs.msg import NavSatFix
+from environment_interfaces.msg import BoatState
 from src.shared_types import Source
 
 class Environment(Node):
@@ -36,8 +37,8 @@ class Environment(Node):
             10,
         )
         self.gps_subscription = self.create_subscription(
-            NavSatFix,
-            "/wamv/sensors/gps/gps/fix", # TODO Subscribe to Theo filtered GPS topic
+            BoatState,
+            "/boat/estimator/position", # TODO Subscribe to Theo filtered GPS topic
             self.gps_callback,
             10,
         )
@@ -50,36 +51,42 @@ class Environment(Node):
         # Class attributes
         self.usv_x = 0
         self.usv_y = 0
+        self.usv_theta = 0
         self.buoy_info_lidar = BuoyInfo()
         self.buoy_info_pinger = BuoyInfo()
+        self.buoy_pos = Point()
 
     def buoy_listener_callback(self, msg: BuoyInfo):
-        self.get_logger().info("BuoyInfo received") # DEBUG
+        #self.get_logger().info("BuoyInfo received") # DEBUG
         if msg.source == Source.ACOUSTIC:
             self.buoy_info_pinger.distance = msg.distance
             self.buoy_info_pinger.angle = msg.angle
             self.buoy_info_pinger.is_found = msg.is_found
-            #msg gives (x,y) as relative pos, add current USV (X;Y) to find buoy (X;Y) pos
-            self.buoy_info_pinger.x = msg.x + self.usv_x
-            self.buoy_info_pinger.y = msg.y + self.usv_y
+
             buoy_pos = Point()
-            buoy_pos.x = self.buoy_info_pinger.x
-            buoy_pos.y = self.buoy_info_pinger.y
+            buoy_pos.y = self.usv_y + (msg.distance * math.sin(msg.angle + self.usv_theta)) # Consider USV orientation
+            buoy_pos.x = self.usv_x + (msg.distance * math.cos(msg.angle + self.usv_theta)) # Consider USV orientation
+            self.get_logger().info(f"[buoy] pos ({buoy_pos.x:.2f};{buoy_pos.y:.2f}) ; pinger {msg.angle:.2f} ; usv {self.usv_theta:.2f} ")
             self.buoy_pos_publisher.publish(buoy_pos)
+    
+    def lidar_object_callback(self, LidarObject):
+        a = 0
+        #self.get_logger().info("LidarObject received") # DEBUG
+        # TODO switch Source
 
     def threat_listener_callback(self, msg: ThreatInfo):
-        self.get_logger().info("ThreatInfo received") # DEBUG
+        a = 0
+        #self.get_logger().info("ThreatInfo received") # DEBUG
         # TODO switch Source
 
-    def lidar_object_callback(self, msg: LidarObject):
-        self.get_logger().info("LidarObject received") # DEBUG
-        # TODO switch Source
-
-    def gps_callback(self, msg: NavSatFix):
-        self.get_logger().info("NavSatFix received") # DEBUG
+    def gps_callback(self, msg: BoatState):
+        #self.get_logger().info("BoatState received") # DEBUG
+        self.usv_x = msg.x
+        self.usv_y = msg.y
+        self.usv_theta = msg.theta
 
     def run(self):
-        self.get_logger().info("Environment module starts running...")
+        #self.get_logger().info("Environment module starts running...")
         sleeping_node = rclpy.create_node("waiting_node")
 
         # Initialize ROS nodes

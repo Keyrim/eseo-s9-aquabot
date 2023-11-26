@@ -102,7 +102,7 @@ class Estimator(Node):
         y = math.sin(dLon) * math.cos(math.radians(latitude))
         x = math.cos(math.radians(self.base_lat)) * math.sin(math.radians(latitude)) - math.sin(math.radians(self.base_lat)) * math.cos(math.radians(latitude)) * math.cos(dLon)
         bearing = math.atan2(y, x)
-        y = - distance * math.cos(bearing)
+        y = distance * math.cos(bearing)
         x = distance * math.sin(bearing)
         return x, y
 
