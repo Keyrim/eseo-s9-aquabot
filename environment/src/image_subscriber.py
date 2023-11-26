@@ -43,6 +43,8 @@ class ImageSubscriber(Node):
         self.fov_deg = 80  # FOV de la caméra
         self.px_left_angle_deg = self.fov_deg / 2
         self.px_right_angle_deg = -self.fov_deg / 2
+        self.threat_lost_published_flag = False # 1 seule publication quand la menace est perdue de vue
+        self.buoy_lost_published_flag = False # 1 seule publication quand la bouée est perdue de vue
 
     def threat_tracker(self, msg: Image):
         # Le Y de la menace est toujours supérieur à cette valeur (pour ne pas capter les arbres en hauteur)
@@ -111,12 +113,22 @@ class ImageSubscriber(Node):
                 2,
             )
 
-        threat_info = ThreatInfo()
-        threat_info.source = Source.CAMERA
-        threat_info.is_found = threat_element.area > 0
-        threat_info.angle = math.radians(threat_element.angle)
-        threat_info.distance = 0.0
-        self.threat_position_publisher.publish_threat_position(threat_info)
+        is_threat_found = threat_element.area > 0 # True si la menace est trouvée
+        # Publier la menace si visible ou si on vient de la perdue de vue
+        if is_threat_found is True or self.threat_lost_published_flag is False:
+            # Si la menace est perdue de vue, publier une menace avec is_found = False et lever le flag
+            if is_threat_found is False:
+                self.threat_lost_published_flag = True # On ne rentrera dans le if N+1 que si on repère à nouveau la menace
+            else:
+                self.threat_lost_published_flag = False# Menace repérée, on baisse le flag
+            
+            threat_info = ThreatInfo()
+            threat_info.source = Source.CAMERA
+            threat_info.is_found = is_threat_found
+            threat_info.angle = math.radians(threat_element.angle)
+            threat_info.distance = 0.0
+            self.threat_position_publisher.publish_threat_position(threat_info)
+        
         # Afficher l'image
         cv2.imshow("Threat tracker CAMERA", image)
         cv2.waitKey(1)
@@ -171,7 +183,8 @@ class ImageSubscriber(Node):
             # cv2.putText(image, f"center : ({element.x};{element.y};{element.angle}°)", (element.x - 20, element.y - 20), 
             #     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2) # DEBUG
 
-        if buoy_element.area > 0:
+        is_buoy_found = buoy_element.area > 0 # True si la bouée est trouvée
+        if is_buoy_found is True:
             cv2.circle(image, (buoy_element.x, buoy_element.y), 3, (255, 0, 0), -1)
             cv2.putText(
                 image,
@@ -184,18 +197,26 @@ class ImageSubscriber(Node):
                 2,
             )
 
-        buoy_info = BuoyInfo()
-        buoy_info.source = Source.CAMERA
-        buoy_info.is_found = buoy_element.area > 0
-        # self.get_logger().info("angle", buoy_element.angle, "angle - 90", buoy_element.angle-90)
+        # Publier la bouée si visible ou si on vient de la perdue de vue
+        if is_buoy_found is True or self.buoy_lost_published_flag is False:
+            # Si la bouée est perdue de vue, publier une bouée avec is_found = False et lever le flag
+            if is_buoy_found is False:
+                self.buoy_lost_published_flag = True # On ne rentrera dans le if N+1 que si on repère à nouveau la bouée
+            else:
+                self.buoy_lost_published_flag = False# bouée repérée, on baisse le flag
+            # Publier les infos de la bouée
+            buoy_info = BuoyInfo()
+            buoy_info.source = Source.CAMERA
+            buoy_info.is_found = is_buoy_found
+            buoy_info.angle = math.radians(buoy_element.angle)
+            buoy_info.distance = 0.0
+            self.buoy_position_publisher.publish_buoy_position(buoy_info)
 
-        buoy_info.angle = math.radians(buoy_element.angle)
-        buoy_info.distance = 0.0
-        self.buoy_position_publisher.publish_buoy_position(buoy_info)
         # Afficher l'image
         cv2.imshow("Buoy tracker CAMERA", image)
         cv2.waitKey(1)
 
     def listener_callback(self, msg):
+        # 2 trackers différents pour la menace et la bouée
         self.threat_tracker(msg)
         self.buoy_tracker(msg)
