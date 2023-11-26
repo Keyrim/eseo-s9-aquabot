@@ -11,10 +11,12 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(geometry_msgs REQUIRED)
+find_package(environment_interfaces REQUIRED)
 
 add_executable(planificator_node src/planificator_node.cpp)
 ament_target_dependencies(planificator_node rclcpp)
 ament_target_dependencies(planificator_node geometry_msgs)
+ament_target_dependencies(planificator_node environment_interfaces)
 target_include_directories(planificator_node PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
