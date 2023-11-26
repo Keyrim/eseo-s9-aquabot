@@ -41,8 +41,8 @@ class ImageSubscriber(Node):
         self.threat_position_publisher = threat_position_publisher
         self.buoy_position_publisher = buoy_position_publisher
         self.fov_deg = 80  # FOV de la caméra
-        self.px_left_angle_deg = 180 - ((self.fov_deg / 2) / 2)
-        self.px_right_angle_deg = (self.fov_deg / 2) / 2
+        self.px_left_angle_deg = self.fov_deg / 2
+        self.px_right_angle_deg = -self.fov_deg / 2
 
     def threat_tracker(self, msg: Image):
         # Le Y de la menace est toujours supérieur à cette valeur (pour ne pas capter les arbres en hauteur)
@@ -59,7 +59,7 @@ class ImageSubscriber(Node):
 
         # Filtrer l'image pour obtenir uniquement les pixels rouges
         mask = cv2.inRange(image, lower_red, upper_red)
-        # cv2.imshow("Masque Rouge", mask) # DEBUG
+        # cv2.imshow("Threat mask", mask) # DEBUG
 
         # Trouver les contours des objets rouges dans le range
         contours = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -77,10 +77,9 @@ class ImageSubscriber(Node):
                 if M["m00"] != 0 and M["m01"] != 0:
                     cX = int(M["m10"] / M["m00"])
                     cY = int(M["m01"] / M["m00"])
-                threat_angle = (
-                    self.px_left_angle_deg
-                    + ((self.px_right_angle_deg - self.px_left_angle_deg) / msg.width) * cX
-                )
+                deg_per_px = self.fov_deg / msg.width
+                threat_angle = self.px_right_angle_deg + (deg_per_px * (msg.width - cX)) # Max angle à gauche, min angle à droite (trigo)
+                
                 found_elements.append(CameraFoundElement(cX, cY, threat_angle, area, contour))
 
         # Trouver la menace parmi les éléments trouvés en se basant sur la surface et la position en Y
@@ -103,8 +102,9 @@ class ImageSubscriber(Node):
             cv2.circle(image, (threat_element.x, threat_element.y), 3, (0, 0, 255), -1)
             cv2.putText(
                 image,
-                f"area : {threat_element.area} (X;Y) : ({threat_element.x};{threat_element.y}) theta_deg {threat_element.angle:.2f})",
-                (threat_element.x - 20, threat_element.y - 20),
+                # f"area : {threat_element.area} (X;Y) : ({threat_element.x};{threat_element.y}) theta_deg {threat_element.angle:.2f})", # DEBUG
+                f"theta_threat [-40;40 deg] {threat_element.angle:.2f}",
+                (threat_element.x - 70, threat_element.y - 20),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 0.3,
                 (0, 0, 255),
@@ -133,7 +133,7 @@ class ImageSubscriber(Node):
 
         # Filtrer l'image pour obtenir uniquement les pixels dans le range
         mask = cv2.inRange(image, lower_buoy, upper_buoy)
-        cv2.imshow("Masque Rouge", mask) # DEBUG
+        # cv2.imshow("Buoy mask", mask) # DEBUG
 
         # Trouver les contours des objets du range
         contours = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -151,9 +151,8 @@ class ImageSubscriber(Node):
                 if M["m00"] != 0 and M["m01"] != 0:
                     cX = int(M["m10"] / M["m00"])
                     cY = int(M["m01"] / M["m00"])
-                buoy_angle_coef_from_center = (self.fov_deg)/math.sqrt(msg.width * msg.height)
-                center_x = msg.width/2
-                buoy_angle = buoy_angle_coef_from_center * (cX - center_x)
+                deg_per_px = self.fov_deg / msg.width
+                buoy_angle = self.px_right_angle_deg + (deg_per_px * (msg.width - cX)) # Max angle à gauche, min angle à droite (sens trigo)
                 found_elements.append(CameraFoundElement(cX, cY, buoy_angle, area, contour))
 
         # Trouver la bouée parmi les éléments trouvés en se basant sur la surface et la position en Y
@@ -176,8 +175,9 @@ class ImageSubscriber(Node):
             cv2.circle(image, (buoy_element.x, buoy_element.y), 3, (255, 0, 0), -1)
             cv2.putText(
                 image,
-                f"area : {buoy_element.area} (X;Y) : ({buoy_element.x};{buoy_element.y}) theta_deg {buoy_element.angle:.2f})",
-                (buoy_element.x - 20, buoy_element.y - 20),
+                # f"area : {buoy_element.area} (X;Y) : ({buoy_element.x};{buoy_element.y}) theta_deg {buoy_element.angle:.2f})", #DEBUG
+                f"theta_buoy [-40;40 deg] {buoy_element.angle:.2f}",
+                (buoy_element.x - 70, buoy_element.y - 20),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 0.3,
                 (0, 0, 255),
