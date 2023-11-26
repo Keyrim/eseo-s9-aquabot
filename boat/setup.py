@@ -1,6 +1,6 @@
 from setuptools import find_packages, setup
 
-package_name = 'estimator'
+package_name = 'boat'
 
 setup(
     name=package_name,
@@ -20,7 +20,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'estimator = estimator.estimator_node:main'
+            'estimator = boat.estimator:main'
         ],
     },
 )
