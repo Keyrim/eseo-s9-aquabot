@@ -5,6 +5,7 @@
 #include "geometry_msgs/msg/point.hpp"
 #include "std_msgs/msg/string.hpp"
 
+
 const int DELTA = 2;
 
 struct Point {
@@ -155,7 +156,7 @@ std::vector<Point> minimizePath(std::vector<Point> &path) {
     std::vector<Point> path_point;
     path_point.push_back(path.at(0));
 
-    for (int i = 0; i < path.size()-3; i++ ) {
+    for (int i = 0; i < (int)path.size()-3; i++ ) {
         Point first_point = path.at(i);
         Point second_point = path.at(i+1);
         Point third_point = path.at(i+2);
@@ -183,84 +184,72 @@ private :
                                         new Obstacle(*new Point(-40, 220), 30),
                                         new Obstacle(*new Point(-44, -95), 30),
                                         new Obstacle(*new Point(-30, -150), 30)};
-    Point initialPoint = null;
     bool isPursuit = true;
 
     // Infos Bateau
-    Point start = null;
+    Point start = Point(-1000,-1000);
     Point initialVelocity = Point(0,0);
-    Point goal = null;
+    Point goal = Point(-1000,-1000);
     std::vector<Obstacle *> obstaclesBateau = {};
 
     //Topics
-    rclcpp::Subscription<geometry_msgs::msg::Point>::SharedPtr start_subscription_;
-    rclcpp::Subscription<geometry_msgs::msg::Point>::SharedPtr goal_subscription_;
-    rclcpp::Publisher<geometry_msgs::msg::Point>::SharedPtr traj_publisher_;
+    // rclcpp::Subscription<Point*>::SharedPtr start_subscription_;
+    // rclcpp::Subscription<Point*>::SharedPtr goal_subscription_;
+    // rclcpp::Publisher<geometry_msgs::msg::Point>::SharedPtr traj_publisher_;
 
-    //Service 
-    rclcpp::Service<geometry_msgs::srv::GetPlan>::SharedPtr start_service_;
+    // void startCallback(const Point* msg) {
 
-    void startCallback(const geometry_msgs::msg::Point::SharedPtr msg) {
+    //     Point tmpPoint = gps_to_Point(msg->x,msg->y);
+    //     this.start.x = tmpPoint.x + this.initialPoint.x;
+    //     this.start.y = tmpPoint.y + this.initialPoint.y;
+    //     calculateAndPublishTrajectory();
+    // }
 
-        Point tmpPoint = gps_to_Point(msg->x,msg->y);
-        this.start.x = tmpPoint.x + this.initialPoint.x;
-        this.start.y = tmpPoint.y + this.initialPoint.y;
-        calculateAndPublishTrajectory();
-    }
+    // void goalCallback(const Point* msg) {
+    //     Point tmpPoint = gps_to_Point(msg->x,msg->y);
+    //     this.goal.x = tmpPoint.x + this.initialPoint.x;
+    //     this.goal.y = tmpPoint.y + this.initialPoint.y;
+    // }
 
-    void goalCallback(const geometry_msgs::msg::Point::SharedPtr msg) {
-        Point tmpPoint = gps_to_Point(msg->x,msg->y);
-        this.goal.x = tmpPoint.x + this.initialPoint.x;
-        this.goal.y = tmpPoint.y + this.initialPoint.y;
-    }
+    // void obstaclesCallback(const std::vector<Point*> msg) {
+    //     std::vector<Obstacle *> l_obstaclesBateau = {};
+    //     for (auto position : msg){
+    //         Point tmpPoint = gps_to_Point(*position.x, *position.y);
+    //         l_obstaclesBateau.push_back(new Obstacle(*new Point(tmpPoint.x + this.initialPoint.x, tmpPoint.y + this.initialPoint.y), 20));
+    //     }
+    //     this.obstaclesBateau = l_obstaclesBateau;
+    // }
 
-    void obstaclesCallback(const geometry_msgs::msg::std::vector<Point*> msg) {
-        std::vector<Obstacle *> l_obstaclesBateau = {};
-        for (auto position : msg){
-            Point tmpPoint = gps_to_Point(*position.x, *position.y);
-            l_obstaclesBateau.push_back(new Obstacle(*new Point(tmpPoint.x + this.initialPoint.x, tmpPoint.y + this.initialPoint.y), 20));
-        }
-        this.obstaclesBateau = l_obstaclesBateau;
-    }
+    // void calculateAndPublishTrajectory() {
 
-    void getStartPosition(const std::shared_ptr<geometry_msgs::srv::GetPlan::Request> request,
-                          std::shared_ptr<geometry_msgs::srv::GetPlan::Response> response) {
-        response->start.x = start.x;
-        response->start.y = start.y;
-    }
+    //     if(!isPursuit){
+    //         // Algo pour goal patrouille
+    //     }
 
-    void calculateAndPublishTrajectory() {
+    //     std::vector<Point> path = planificationTrajectoire(this.start, this.initialVelocity, this.goal, this.obstacles, this.obstaclesBateau);
+    //     std::vector<Point> min_path = minimizePath(path);
 
-        if(!isPursuit){
-            // Algo pour goal patrouille
-        }
+    //     // Publish the trajectory
+    //     custom_msg::msg::Trajectory traj_msg;
+    //     for (const auto &point : min_path) {
+    //         traj_msg.x_points.push_back(point.x);
+    //         traj_msg.y_points.push_back(point.y);
+    //     }
 
-        std::vector<Point> path = planificationTrajectoire(this.start, this.initialVelocity, this.goal, this.obstacles, this.obstaclesBateau);
-        std::vector<Point> min_path = minimizePath(path);
-
-        // Publish the trajectory
-        custom_msg::msg::Trajectory traj_msg;
-        for (const auto &point : min_path) {
-            traj_msg.x_points.push_back(point.x);
-            traj_msg.y_points.push_back(point.y);
-        }
-
-        traj_publisher_->publish(traj_msg);
-    }
+    //     traj_publisher_->publish(traj_msg);
+    // }
 
 public:
     TrajectoryPlanner()
         : Node("trajectory_planner_node") {
-            this.start_subscription_ = this->create_subscription<geometry_msgs::msg::Point>(
-                "/start", 10, std::bind(&TrajectoryPlanner::startCallback, this, std::placeholders::_1));
 
-            this.goal_subscription_ = this->create_subscription<geometry_msgs::msg::Point>(
-                "/goal", 10, std::bind(&TrajectoryPlanner::goalCallback, this, std::placeholders::_1));
+            // this->start_subscription_ = this->create_subscription<geometry_msgs::msg::Point>(
+            //     "/start", 10, std::bind(&TrajectoryPlanner::startCallback, this, std::placeholders::_1));
 
-            this.traj_publisher_ = this->create_publisher<geometry_msgs::msg::Point>("/traj", 10);
+            // this->goal_subscription_ = this->create_subscription<geometry_msgs::msg::Point>(
+            //     "/goal", 10, std::bind(&TrajectoryPlanner::goalCallback, this, std::placeholders::_1));
 
-            this.start_service_ = this->create_service<geometry_msgs::srv::GetPlan>(
-                "/get_start_position", std::bind(&TrajectoryPlanner::getStartPosition, this, std::placeholders::_1, std::placeholders::_2));
+            // this->traj_publisher_ = this->create_publisher<geometry_msgs::msg::Point>("/traj", 10);
     }
 };
 
@@ -270,3 +259,4 @@ int main(int argc, char *argv[]) {
     rclcpp::shutdown();
     return 0;
 }
+
