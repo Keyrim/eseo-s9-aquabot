@@ -12,7 +12,7 @@ find_package(ament_cmake REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
-  "msg/LidarObject.msg"
+  "msg/LidarCluster.msg"
   "msg/BuoyInfo.msg"
   "msg/ThreatInfo.msg" 
   "msg/BoatState.msg"
