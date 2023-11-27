@@ -12,6 +12,7 @@ from environment_interfaces.msg import LidarCluster
 from src.shared_types import Source
 from boat.boat_state import BoatStateReceiver
 from src.buoy_pinger_subscriber import BuoyPingerSubscriber
+from src.allies_subscriber import AlliesPositionSubscriber
 
 class Environment(Node):
     def __init__(self):
@@ -35,15 +36,17 @@ class Environment(Node):
         )
         self.boat_state_receiver = BoatStateReceiver(self)
         self.buoy_pinger_subscriber = BuoyPingerSubscriber(self)
+        self.allies_position_subscriber = AlliesPositionSubscriber(self)
         # Class attributes
         self.usv_x = 0.0
         self.usv_y = 0.0
         self.usv_theta = 0.0
+        self.allies_pos_xy = []
         self.buoy_pos_pinger = Point() # Set by BuoyPingerSubscriber
         self.base_lat = 48.046300000000 # TODO remove
         self.base_lon = -4.976320000000 # TODO remove
         self.buoy_info_lidar = BuoyInfo()
-        self.buoy_pos = {Source.ACOUSTIC: Point(), Source.LIDAR: Point(), Source.CAMERA: Point()}
+        self.buoy_pos_xy = {Source.ACOUSTIC: Point(), Source.LIDAR: Point(), Source.CAMERA: Point()}
 
     def lidar_cluster_callback(self, msg: LidarCluster):
         pass
@@ -62,10 +65,20 @@ class Environment(Node):
     def buoy_pinger_cb(self):
         buoy_range = self.buoy_pinger_subscriber.buoy_range
         buoy_theta = self.buoy_pinger_subscriber.buoy_theta
-        self.buoy_pos[Source.ACOUSTIC].x = self.usv_x + (buoy_range * math.cos(buoy_theta + self.usv_theta)) # Consider USV orientation
-        self.buoy_pos[Source.ACOUSTIC].y = self.usv_y + (buoy_range * math.sin(buoy_theta + self.usv_theta)) # Consider USV orientation
-        self.get_logger().info(f"[buoy] pos ({self.buoy_pos[Source.ACOUSTIC].x:.2f};{self.buoy_pos[Source.ACOUSTIC].y:.2f}) ; pinger {buoy_theta:.2f} ; usv {self.usv_theta:.2f}")
-        self.buoy_pos_publisher.publish(self.buoy_pos[Source.ACOUSTIC])
+        self.buoy_pos_xy[Source.ACOUSTIC].x = self.usv_x + (buoy_range * math.cos(buoy_theta + self.usv_theta)) # Consider USV orientation
+        self.buoy_pos_xy[Source.ACOUSTIC].y = self.usv_y + (buoy_range * math.sin(buoy_theta + self.usv_theta)) # Consider USV orientation
+        self.get_logger().info(f"[buoy] pos ({self.buoy_pos_xy[Source.ACOUSTIC].x:.2f};{self.buoy_pos_xy[Source.ACOUSTIC].y:.2f}) ; pinger {buoy_theta:.2f} ; usv {self.usv_theta:.2f}")
+        self.buoy_pos_publisher.publish(self.buoy_pos_xy[Source.ACOUSTIC])
+
+    def allies_position_cb(self):
+        init_flag = (len(self.allies_pos_xy) == 0)
+        count = 0
+        for ally_pos in self.allies_position_subscriber.allies_pos:
+            if init_flag is True:
+                self.allies_pos_xy.append(self.convert_gps_to_xy(ally_pos[0], ally_pos[1]))
+            else:
+                self.allies_pos_xy[count] = self.convert_gps_to_xy(ally_pos[0], ally_pos[1])
+                # print(f"Ally[{count} : ({self.allies_pos_xy[count][0]:.2f};{self.allies_pos_xy[count][1]:.2f})]") # DEBUG
 
     def run(self):
         #self.get_logger().info("Environment module starts running...")
@@ -95,23 +108,23 @@ class Environment(Node):
         rclpy.shutdown()
         executor_thread.join()
 
-    # def convert_gps_to_xy(self, latitude, longitude):
-    #     # Haversine distance calculation
-    #     R = 6371000  # Earth radius in meters
+    def convert_gps_to_xy(self, latitude, longitude):
+        # Haversine distance calculation
+        R = 6371000  # Earth radius in meters
 
-    #     dLat = math.radians(latitude - self.base_lat)
-    #     dLon = math.radians(longitude - self.base_lon)
-    #     a = math.sin(dLat / 2) * math.sin(dLat / 2) + math.cos(math.radians(self.base_lat)) * math.cos(math.radians(latitude)) * math.sin(dLon / 2) * math.sin(dLon / 2)
-    #     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-    #     distance = R * c
+        dLat = math.radians(latitude - self.base_lat)
+        dLon = math.radians(longitude - self.base_lon)
+        a = math.sin(dLat / 2) * math.sin(dLat / 2) + math.cos(math.radians(self.base_lat)) * math.cos(math.radians(latitude)) * math.sin(dLon / 2) * math.sin(dLon / 2)
+        c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+        distance = R * c
 
-    #     # Calculate x and y based on the distance and bearing
-    #     y = math.sin(dLon) * math.cos(math.radians(latitude))
-    #     x = math.cos(math.radians(self.base_lat)) * math.sin(math.radians(latitude)) - math.sin(math.radians(self.base_lat)) * math.cos(math.radians(latitude)) * math.cos(dLon)
-    #     bearing = math.atan2(y, x)
-    #     y = distance * math.cos(bearing)
-    #     x = distance * math.sin(bearing)
-    #     return x, y
+        # Calculate x and y based on the distance and bearing
+        y = math.sin(dLon) * math.cos(math.radians(latitude))
+        x = math.cos(math.radians(self.base_lat)) * math.sin(math.radians(latitude)) - math.sin(math.radians(self.base_lat)) * math.cos(math.radians(latitude)) * math.cos(dLon)
+        bearing = math.atan2(y, x)
+        y = distance * math.cos(bearing)
+        x = distance * math.sin(bearing)
+        return x, y
     
 def main(args=None):
     rclpy.init()
