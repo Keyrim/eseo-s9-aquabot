@@ -8,7 +8,7 @@ class IMUHandler:
         self.node = node
         self.theta = 0
         self.subscription = node.create_subscription(
-            Imu, in_topic_imu, self.callback, 10)
+            Imu, TOPIC_IMU, self.callback, 10)
 
     def callback(self, msg):
         # Get the orientation of the boat from the IMU
@@ -18,4 +18,4 @@ class IMUHandler:
         w = msg.orientation.w
         self.theta = math.atan2(2 * (w * z + x * y), 1 - 2 * (y * y + z * z))
         # Publish the state of the boat
-        self.node.publish_state()
+        self.node.imu_handler_cb()
