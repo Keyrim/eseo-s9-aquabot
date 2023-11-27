@@ -101,7 +101,7 @@ class LidarSubscriber(Node):
                 cluster = LidarCluster()
                 cluster.relative_theta = theta_rad - self.usv_theta
                 cluster.absolute_theta = theta_rad
-                cluster.distance = distance
+                cluster.range = distance
                 cluster.x = central_point[0]
                 cluster.y = central_point[1]
                 self.lidar_cluster_publisher.publish(cluster)
