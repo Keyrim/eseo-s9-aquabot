@@ -3,7 +3,8 @@
 #include <cmath>
 #include "rclcpp/rclcpp.hpp"
 #include "environment_interfaces/msg/boat_trajectory.hpp"
-
+#include "geometry_msgs/msg/pose_array.hpp"
+#include "geometry_msgs/msg/pose.hpp"
 #include "geometry_msgs/msg/point.hpp"
 #include "std_msgs/msg/string.hpp"
 
@@ -11,10 +12,14 @@ class TrajectoryPlanner : public rclcpp::Node {
 private :
     const int DELTA = 2;
 
-    struct Point {
-    int x, y;
+    double toRadians(double degrees) {
+        return degrees * M_PI / 180.0;
+    }
 
-    Point(int x, int y) : x(x), y(y) {}
+    struct Point {
+    double x, y;
+
+    Point(double x, double y) : x(x), y(y) {}
 
 
     double distanceTo(const Point &other) {
@@ -28,20 +33,20 @@ private :
 
     struct Obstacle {
         Point position;
-        int diametre;
+        int diameter;
 
-        Obstacle(const Point &pos, int diam) : position(pos), diametre(diam) {}
+        Obstacle(const Point &pos, int diam) : position(pos), diameter(diam) {}
     };
 
     struct NodeTraj {
         Point position;
-        double restant_score;
+        double remainingScore;
         Point velocity;
 
-        NodeTraj(Point& pos, double f) : position(pos), restant_score(f), velocity(*new Point(0, 0)) {}
+        NodeTraj(Point& pos, double f) : position(pos), remainingScore(f), velocity(*new Point(0, 0)) {}
 
         bool operator>(const NodeTraj &other) const {
-            return restant_score > other.restant_score;
+            return remainingScore > other.remainingScore;
         }
     };
 
@@ -60,37 +65,44 @@ private :
     bool isFirstTrajPat = true;
 
     // Infos Bateau
+    double baseLat = 48.046300000000;
+    double baseLon = -4.976320000000; 
     Point start = Point(-1000,-1000);
     Point initialVelocity = Point(0,0);
     Point goal = Point(-1000,-1000);
-    std::vector<Obstacle *> obstaclesBateau = {};
+    std::vector<Obstacle *> alliesBoat = {};
 
     //Topics
-    rclcpp::Subscription<geometry_msgs::msg::Point>::SharedPtr start_subscription_;
-    rclcpp::Subscription<geometry_msgs::msg::Point>::SharedPtr goal_subscription_;
-    rclcpp::Publisher<environment_interfaces::msg::BoatTrajectory>::SharedPtr traj_publisher_;
+    rclcpp::Subscription<geometry_msgs::msg::Point>::SharedPtr startSubscription;
+    rclcpp::Subscription<geometry_msgs::msg::Point>::SharedPtr goalSubscription;
+    rclcpp::Subscription<geometry_msgs::msg::PoseArray>::SharedPtr alliesSubscription;
+
+    // Publisher
+    rclcpp::Publisher<environment_interfaces::msg::BoatTrajectory>::SharedPtr trajPublisher;
 
     void startCallback(geometry_msgs::msg::Point msg) {
-
         this->start.x = msg.x;
         this->start.y = msg.y;
         // calculateAndPublishTrajectory();
     }
 
     void goalCallback(geometry_msgs::msg::Point msg) {
-
         this->goal.x = msg.x;
         this->goal.y = msg.y;
     }
 
-    // void obstaclesCallback(const std::vector<Point*> msg) {
-    //     std::vector<Obstacle *> l_obstaclesBateau = {};
-    //     for (auto position : msg){
-    //         Point tmpPoint = gps_to_Point(*position.x, *position.y);
-    //         l_obstaclesBateau.push_back(new Obstacle(*new Point(tmpPoint.x + this.initialPoint.x, tmpPoint.y + this.initialPoint.y), 20));
-    //     }
-    //     this.obstaclesBateau = l_obstaclesBateau;
-    // }
+    void alliesCallback(geometry_msgs::msg::PoseArray allies) {
+
+        std::vector<Obstacle *> l_alliesBoat = {};
+        
+        for (int i = 0 ; i < (int)allies.poses.size() ; i++ ){
+
+            geometry_msgs::msg::Pose pose = allies.poses[i];
+            Point tmpPoint = convert_gps_to_xy(pose.position.x, pose.position.y);
+            l_alliesBoat.push_back(new Obstacle(tmpPoint, 20));
+        }
+        this->alliesBoat = l_alliesBoat;
+    }
 
     void calculateAndPublishTrajectory() {
 
@@ -113,17 +125,17 @@ private :
                 }
             }
 
-            std::vector<Point> path = planificationTrajectoire(this->start, this->initialVelocity, this->goal, this->obstacles, this->obstaclesBateau);
-            std::vector<Point> min_path = minimizePath(path);
+            std::vector<Point> path = planificationTrajectoire(this->start, this->initialVelocity, this->goal, this->obstacles, this->alliesBoat);
+            std::vector<Point> minPath = minimizePath(path);
 
             // Publish the trajectory
-            environment_interfaces::msg::BoatTrajectory traj_msg;
+            environment_interfaces::msg::BoatTrajectory trajMsg;
             for (int i = 0; i<4;i++) {
-                traj_msg.x[i] = min_path.at(i).x;
-                traj_msg.y[i] = min_path.at(i).y;
+                trajMsg.x[i] = minPath.at(i).x;
+                trajMsg.y[i] = minPath.at(i).y;
             }
 
-            traj_publisher_->publish(traj_msg);
+            trajPublisher->publish(trajMsg);
         }   
     }
 
@@ -131,13 +143,16 @@ public:
     TrajectoryPlanner()
         : Node("trajectory_planner_node") {
 
-            this->start_subscription_ = this->create_subscription<geometry_msgs::msg::Point>(
-                "/start", 10, std::bind(&TrajectoryPlanner::startCallback, this, std::placeholders::_1));
+            this->startSubscription = this->create_subscription<geometry_msgs::msg::Point>(
+                "/boat/estimator/position", 10, std::bind(&TrajectoryPlanner::startCallback, this, std::placeholders::_1));
 
-            this->goal_subscription_ = this->create_subscription<geometry_msgs::msg::Point>(
+            this->goalSubscription = this->create_subscription<geometry_msgs::msg::Point>(
                 "/goal", 10, std::bind(&TrajectoryPlanner::goalCallback, this, std::placeholders::_1));
 
-            this->traj_publisher_ = this->create_publisher<environment_interfaces::msg::BoatTrajectory>("/traj", 10);
+            this->alliesSubscription = this->create_subscription<geometry_msgs::msg::PoseArray>(
+                "/wamv/ais_sensor/allies_positions", 1, std::bind(&TrajectoryPlanner::alliesCallback, this, std::placeholders::_1));
+
+            this->trajPublisher = this->create_publisher<environment_interfaces::msg::BoatTrajectory>("/traj", 10); 
     }
 
     std::vector<Point> planificationTrajectoire(Point &start, Point &initial_velocity, const Point &goal,
@@ -215,10 +230,10 @@ public:
 
     bool isValidPoint(Point &point, const std::vector<Obstacle *> &obstacles) {
         for (auto obs : obstacles) {
-            if (point.x >= (obs->position.x - obs->diametre) 
-                && point.x <= (obs->position.x + obs->diametre) 
-                && point.y >= (obs->position.y - obs->diametre) 
-                && point.y <= (obs->position.y + obs->diametre)) {
+            if (point.x >= (obs->position.x - obs->diameter) 
+                && point.x <= (obs->position.x + obs->diameter) 
+                && point.y >= (obs->position.y - obs->diameter) 
+                && point.y <= (obs->position.y + obs->diameter)) {
                 return false;
             }    
         }
@@ -249,6 +264,25 @@ public:
         }
 
         return path_point;
+    }
+
+    Point convert_gps_to_xy(double latitude, double longitude) {
+        // Haversine distance calculation
+        double R = 6371000;  // Earth radius in meters
+
+        double dLat = toRadians(latitude - baseLat);
+        double dLon = toRadians(longitude - baseLon);
+        double a = sin(dLat / 2) * sin(dLat / 2) + cos(toRadians(baseLat)) * cos(toRadians(latitude)) * sin(dLon / 2) * sin(dLon / 2);
+        double c = 2 * atan2(sqrt(a), sqrt(1 - a));
+        double distance = R * c;
+
+        // Calculate x and y based on the distance and bearing
+        double y = sin(dLon) * cos(toRadians(latitude));
+        double x = cos(toRadians(baseLat)) * sin(toRadians(latitude)) - sin(toRadians(baseLat)) * cos(toRadians(latitude)) * cos(dLon);
+        double bearing = atan2(y, x);
+        y = distance * cos(bearing);
+        x = distance * sin(bearing);
+        return *new Point(x, y);
     }
 };
 
