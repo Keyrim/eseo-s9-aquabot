@@ -6,7 +6,13 @@
 #include "geometry_msgs/msg/pose_array.hpp"
 #include "geometry_msgs/msg/pose.hpp"
 #include "geometry_msgs/msg/point.hpp"
-#include "std_msgs/msg/string.hpp"
+#include "std_msgs/msg/u_int32.hpp"
+
+enum Phase {
+    BUOY,
+    PATROL,
+    PURSUIT,
+};
 
 class TrajectoryPlanner : public rclcpp::Node {
 private :
@@ -51,8 +57,20 @@ private :
     };
 
     // Configuration
-    bool isObstacles = true;
-    std::vector<Obstacle *> obstacles = {new Obstacle(*new Point(120, -50), 25),
+    Phase currentPhase = BUOY;
+    bool isFirstTrajPat = true;
+
+    // Infos Bateau
+    double baseLat = 48.046300000000;
+    double baseLon = -4.976320000000; 
+    Point start = Point(-1000,-1000);
+    Point initialVelocity = Point(0,0);
+
+    // Infos Target
+    Point target = Point(-1000,-1000);
+
+    // Infos Obstacles
+    std::vector<Obstacle *> fixedObstacles = {new Obstacle(*new Point(120, -50), 25),
                                         new Obstacle(*new Point(-152, -6), 50),
                                         new Obstacle(*new Point(110, 130), 50),
                                         new Obstacle(*new Point(12, -102), 25),
@@ -61,34 +79,48 @@ private :
                                         new Obstacle(*new Point(-40, 220), 30),
                                         new Obstacle(*new Point(-44, -95), 30),
                                         new Obstacle(*new Point(-30, -150), 30)};
-    bool isPursuit = true;
-    bool isFirstTrajPat = true;
-
-    // Infos Bateau
-    double baseLat = 48.046300000000;
-    double baseLon = -4.976320000000; 
-    Point start = Point(-1000,-1000);
-    Point initialVelocity = Point(0,0);
-    Point goal = Point(-1000,-1000);
     std::vector<Obstacle *> alliesBoat = {};
 
     //Topics
     rclcpp::Subscription<geometry_msgs::msg::Point>::SharedPtr startSubscription;
-    rclcpp::Subscription<geometry_msgs::msg::Point>::SharedPtr goalSubscription;
+    rclcpp::Subscription<geometry_msgs::msg::Point>::SharedPtr buoySubscription;
+    rclcpp::Subscription<geometry_msgs::msg::Point>::SharedPtr threatSubscription;
     rclcpp::Subscription<geometry_msgs::msg::PoseArray>::SharedPtr alliesSubscription;
+    rclcpp::Subscription<std_msgs::msg::UInt32>::SharedPtr currentPhaseSubscription;
 
     // Publisher
     rclcpp::Publisher<environment_interfaces::msg::BoatTrajectory>::SharedPtr trajPublisher;
 
-    void startCallback(geometry_msgs::msg::Point msg) {
-        this->start.x = msg.x;
-        this->start.y = msg.y;
-        // calculateAndPublishTrajectory();
+    void startCallback(geometry_msgs::msg::Point ourBoat) {
+        this->start.x = ourBoat.x;
+        this->start.y = ourBoat.y;
+        calculateAndPublishTrajectory();
     }
 
-    void goalCallback(geometry_msgs::msg::Point msg) {
-        this->goal.x = msg.x;
-        this->goal.y = msg.y;
+    void buoyCallback(geometry_msgs::msg::Point buoy) {
+
+        if (this->currentPhase == BUOY){
+            this->target.x = buoy.x;
+            this->target.y = buoy.y;
+        } 
+    }
+
+    void threatCallback(geometry_msgs::msg::Point threat) {
+
+        if (this->currentPhase != BUOY){
+            this->target.x = threat.x;
+            this->target.y = threat.y;
+        }
+    }
+
+    void currentPhaseCallback(std_msgs::msg::UInt32 v_currentPhase) {
+        if(v_currentPhase.data == static_cast<uint32_t>(1)){
+            this->currentPhase = BUOY;
+        }else if(v_currentPhase.data == static_cast<uint32_t>(2)){
+            this->currentPhase = PATROL;
+        }else if(v_currentPhase.data == static_cast<uint32_t>(3)){
+            this->currentPhase = PURSUIT;
+        } 
     }
 
     void alliesCallback(geometry_msgs::msg::PoseArray allies) {
@@ -106,31 +138,32 @@ private :
 
     void calculateAndPublishTrajectory() {
 
-        if(this->start != Point(-1000,-1000) && this->goal != Point(-1000,-1000)){
-            if(!isPursuit){
+        if(this->start != Point(-1000,-1000) && this->target != Point(-1000,-1000)){
+
+            if(this->currentPhase == PATROL){
                 if(isFirstTrajPat){
-                    this->goal = Point(200,-200);
+                    this->target = Point(200,-200);
                 }else{
                     if(this->start.x > 150 && this->start.y < -150){
-                        this->goal = Point(-200,-200);
+                        this->target = Point(-200,-200);
                     }else if(this->start.x < -150 && this->start.y < -150){
-                        this->goal = Point(-200,200);
+                        this->target = Point(-200,200);
                     }else if(this->start.x < -150 && this->start.y > 150){
-                        this->goal = Point(0,0);
+                        this->target = Point(0,0);
                     }else if(this->start.x > -100 && this->start.x < 100 && this->start.y > -100 && this->start.y < 100){
-                        this->goal = Point(200,200);
+                        this->target = Point(200,200);
                     }else if(this->start.x > 150 && this->start.y > 150){
-                        this->goal = Point(200,-200);
+                        this->target = Point(200,-200);
                     } 
                 }
             }
 
-            std::vector<Point> path = planificationTrajectoire(this->start, this->initialVelocity, this->goal, this->obstacles, this->alliesBoat);
+            std::vector<Point> path = planificationTrajectoire(this->start, this->initialVelocity, this->target, this->fixedObstacles, this->alliesBoat);
             std::vector<Point> minPath = minimizePath(path);
 
             // Publish the trajectory
             environment_interfaces::msg::BoatTrajectory trajMsg;
-            for (int i = 0; i<4;i++) {
+            for (int i = 0; i < ((int)minPath.size() < 4 ? (int)minPath.size() : 4);i++) {
                 trajMsg.x[i] = minPath.at(i).x;
                 trajMsg.y[i] = minPath.at(i).y;
             }
@@ -146,13 +179,19 @@ public:
             this->startSubscription = this->create_subscription<geometry_msgs::msg::Point>(
                 "/boat/estimator/position", 10, std::bind(&TrajectoryPlanner::startCallback, this, std::placeholders::_1));
 
-            this->goalSubscription = this->create_subscription<geometry_msgs::msg::Point>(
-                "/goal", 10, std::bind(&TrajectoryPlanner::goalCallback, this, std::placeholders::_1));
+            this->buoySubscription = this->create_subscription<geometry_msgs::msg::Point>(
+                "/buoy", 10, std::bind(&TrajectoryPlanner::buoyCallback, this, std::placeholders::_1));
+
+            this->threatSubscription = this->create_subscription<geometry_msgs::msg::Point>(
+                "/threat", 10, std::bind(&TrajectoryPlanner::threatCallback, this, std::placeholders::_1));
+
+            this->currentPhaseSubscription = this->create_subscription<std_msgs::msg::UInt32>(
+                "/vrx/patrolandfollow/current_phase", 10, std::bind(&TrajectoryPlanner::currentPhaseCallback, this, std::placeholders::_1));
 
             this->alliesSubscription = this->create_subscription<geometry_msgs::msg::PoseArray>(
                 "/wamv/ais_sensor/allies_positions", 1, std::bind(&TrajectoryPlanner::alliesCallback, this, std::placeholders::_1));
 
-            this->trajPublisher = this->create_publisher<environment_interfaces::msg::BoatTrajectory>("/traj", 10); 
+            this->trajPublisher = this->create_publisher<environment_interfaces::msg::BoatTrajectory>("/boat/controller/traj", 10); 
     }
 
     std::vector<Point> planificationTrajectoire(Point &start, Point &initial_velocity, const Point &goal,
