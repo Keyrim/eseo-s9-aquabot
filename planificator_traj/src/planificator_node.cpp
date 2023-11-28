@@ -2,7 +2,7 @@
 #include <vector>
 #include <cmath>
 #include "rclcpp/rclcpp.hpp"
-#include "environment_interfaces/msg/boat_trajectory.hpp"
+#include "environment_interfaces/msg/boat_state.hpp"
 #include "geometry_msgs/msg/pose_array.hpp"
 #include "geometry_msgs/msg/pose.hpp"
 #include "geometry_msgs/msg/point.hpp"
@@ -82,18 +82,21 @@ private :
     std::vector<Obstacle *> alliesBoat = {};
 
     //Topics
-    rclcpp::Subscription<geometry_msgs::msg::Point>::SharedPtr startSubscription;
+    rclcpp::Subscription<environment_interfaces::msg::BoatState>::SharedPtr startSubscription;
     rclcpp::Subscription<geometry_msgs::msg::Point>::SharedPtr buoySubscription;
     rclcpp::Subscription<geometry_msgs::msg::Point>::SharedPtr threatSubscription;
+    rclcpp::Subscription<geometry_msgs::msg::Point>::SharedPtr helpThreatSubscription;
     rclcpp::Subscription<geometry_msgs::msg::PoseArray>::SharedPtr alliesSubscription;
     rclcpp::Subscription<std_msgs::msg::UInt32>::SharedPtr currentPhaseSubscription;
 
     // Publisher
-    rclcpp::Publisher<environment_interfaces::msg::BoatTrajectory>::SharedPtr trajPublisher;
+    rclcpp::Publisher<geometry_msgs::msg::Point>::SharedPtr trajPublisher;
 
-    void startCallback(geometry_msgs::msg::Point ourBoat) {
+    void startCallback(environment_interfaces::msg::BoatState ourBoat) {
         this->start.x = ourBoat.x;
         this->start.y = ourBoat.y;
+        this->initialVelocity.x = ourBoat.vx;
+        this->initialVelocity.y = ourBoat.vy;
         calculateAndPublishTrajectory();
     }
 
@@ -162,13 +165,14 @@ private :
             std::vector<Point> minPath = minimizePath(path);
 
             // Publish the trajectory
-            environment_interfaces::msg::BoatTrajectory trajMsg;
-            for (int i = 0; i < ((int)minPath.size() < 4 ? (int)minPath.size() : 4);i++) {
-                trajMsg.x[i] = minPath.at(i).x;
-                trajMsg.y[i] = minPath.at(i).y;
-            }
+            if (minPath.size() > 0){
 
-            trajPublisher->publish(trajMsg);
+                geometry_msgs::msg::Point trajMsg;
+                trajMsg.x = minPath.at(0).x;
+                trajMsg.y = minPath.at(0).y;
+
+                trajPublisher->publish(trajMsg);
+            } 
         }   
     }
 
@@ -176,7 +180,7 @@ public:
     TrajectoryPlanner()
         : Node("trajectory_planner_node") {
 
-            this->startSubscription = this->create_subscription<geometry_msgs::msg::Point>(
+            this->startSubscription = this->create_subscription<environment_interfaces::msg::BoatState>(
                 "/boat/estimator/position", 10, std::bind(&TrajectoryPlanner::startCallback, this, std::placeholders::_1));
 
             this->buoySubscription = this->create_subscription<geometry_msgs::msg::Point>(
@@ -185,13 +189,16 @@ public:
             this->threatSubscription = this->create_subscription<geometry_msgs::msg::Point>(
                 "/threat", 10, std::bind(&TrajectoryPlanner::threatCallback, this, std::placeholders::_1));
 
+            this->helpThreatSubscription = this->create_subscription<geometry_msgs::msg::Point>(
+                "/wamv/ais_sensor/ennemy_position ", 0.1, std::bind(&TrajectoryPlanner::threatCallback, this, std::placeholders::_1));
+
             this->currentPhaseSubscription = this->create_subscription<std_msgs::msg::UInt32>(
                 "/vrx/patrolandfollow/current_phase", 10, std::bind(&TrajectoryPlanner::currentPhaseCallback, this, std::placeholders::_1));
 
             this->alliesSubscription = this->create_subscription<geometry_msgs::msg::PoseArray>(
                 "/wamv/ais_sensor/allies_positions", 1, std::bind(&TrajectoryPlanner::alliesCallback, this, std::placeholders::_1));
 
-            this->trajPublisher = this->create_publisher<environment_interfaces::msg::BoatTrajectory>("/boat/controller/traj", 10); 
+            this->trajPublisher = this->create_publisher<geometry_msgs::msg::Point>("/boat/controller/traj", 10); 
     }
 
     std::vector<Point> planificationTrajectoire(Point &start, Point &initial_velocity, const Point &goal,
@@ -205,7 +212,7 @@ public:
         initial_node->velocity = initial_velocity;
         path.push_back(initial_node);
 
-        while (!traj_found && i < 2000) {
+        while (!traj_found && i < 1000) {
 
             NodeTraj* current = path.back();
 
@@ -261,9 +268,16 @@ public:
                     
                 }
             }
-            path.push_back(new NodeTraj(best_neighbor, best_neighbor.distanceTo(goal)));
+            if(best_neighbor != Point(-1000,1000)){
+                path.push_back(new NodeTraj(best_neighbor, best_neighbor.distanceTo(goal)));
+            } 
             i++;
         }
+        while (!path.empty()) {
+            path_point.push_back(path.back()->position);
+            path.pop_back();
+        }
+        std::reverse(path_point.begin(), path_point.end());
         return path_point;
     }
 
