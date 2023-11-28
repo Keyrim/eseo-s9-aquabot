@@ -41,14 +41,14 @@ class LidarSubscriber(Node):
 
     def lidar_callback(self, msg: LaserScan):
         # Initialisation de la figure Matplotlib pour le graphique en temps réel, ici pour être dans le même thread que l'utilisation de Matplotlib
-        self.fig, self.ax = plt.subplots()
-        self.points_scatter = self.ax.scatter([], [], color="blue")
-        self.ax.set_xlabel("X")
-        self.ax.set_ylabel("Y")
-        self.ax.set_title("Visualisation des points Lidar")
+        # self.fig, self.ax = plt.subplots()
+        # self.points_scatter = self.ax.scatter([], [], color="blue")
+        # self.ax.set_xlabel("X")
+        # self.ax.set_ylabel("Y")
+        # self.ax.set_title("Visualisation des points Lidar")
         # Définir les limites des axes X et Y
-        self.ax.set_xlim(-400, 400)
-        self.ax.set_ylim(-400, 400)
+        # self.ax.set_xlim(-400, 400)
+        # self.ax.set_ylim(-400, 400)
         # Extraction des données de distances (ranges) du message LaserScan
         ranges = msg.ranges
 
@@ -70,10 +70,10 @@ class LidarSubscriber(Node):
         # Clusterisation avec DBSCAN si des données sont disponibles
         if len(lidar_data) > 0:
             lidar_data = np.array(lidar_data)
-            self.points_scatter.set_offsets(lidar_data)
-            self.fig.canvas.draw()
-            self.fig.canvas.flush_events()
-            plt.pause(0.001)
+            # self.points_scatter.set_offsets(lidar_data)
+            # self.fig.canvas.draw()
+            # self.fig.canvas.flush_events()
+            # plt.pause(0.001)
             eps = 1  # TODO régler les paramètres de DBSCAN
             min_samples = 3  # TODO régler les paramètres de DBSCAN
             dbscan = DBSCAN(eps=eps, min_samples=min_samples)
