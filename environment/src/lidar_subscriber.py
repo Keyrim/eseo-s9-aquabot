@@ -75,7 +75,7 @@ class LidarSubscriber(Node):
             # self.fig.canvas.flush_events()
             # plt.pause(0.001)
             eps = 1  # TODO régler les paramètres de DBSCAN
-            min_samples = 3  # TODO régler les paramètres de DBSCAN
+            min_samples = 4  # TODO régler les paramètres de DBSCAN
             dbscan = DBSCAN(eps=eps, min_samples=min_samples)
             clusters = dbscan.fit_predict(lidar_data)
 
