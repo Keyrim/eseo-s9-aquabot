@@ -184,10 +184,10 @@ public:
                 "/boat/estimator/position", 10, std::bind(&TrajectoryPlanner::startCallback, this, std::placeholders::_1));
 
             this->buoySubscription = this->create_subscription<geometry_msgs::msg::Point>(
-                "/buoy", 10, std::bind(&TrajectoryPlanner::buoyCallback, this, std::placeholders::_1));
+                "/environment/buoy_pos", 10, std::bind(&TrajectoryPlanner::buoyCallback, this, std::placeholders::_1));
 
             this->threatSubscription = this->create_subscription<geometry_msgs::msg::Point>(
-                "/threat", 10, std::bind(&TrajectoryPlanner::threatCallback, this, std::placeholders::_1));
+                "/environment/threat_position", 10, std::bind(&TrajectoryPlanner::threatCallback, this, std::placeholders::_1));
 
             this->helpThreatSubscription = this->create_subscription<geometry_msgs::msg::Point>(
                 "/wamv/ais_sensor/ennemy_position ", 0.1, std::bind(&TrajectoryPlanner::threatCallback, this, std::placeholders::_1));
