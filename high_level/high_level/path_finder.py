@@ -48,7 +48,6 @@ class PathFinder:
         target_x, target_y = target_pos
         target_pos = self.get_scaled_down(target_x, target_y)
         obstacles = self.fix_obstacles + self.moveable_obstacles
-        print(obstacles)
         astar = AStar(self.current_pos, target_pos, obstacles)
         points =  astar.search()
         # Scale up the points from the grid

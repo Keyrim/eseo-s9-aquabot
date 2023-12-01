@@ -4,9 +4,7 @@ from sklearn.cluster import DBSCAN
 import numpy as np
 from rclpy.node import Node
 from environment_interfaces.msg import BoatState
-import matplotlib.pyplot as plt
 from environment_interfaces.msg import LidarCluster
-
 
 class LidarSubscriber(Node):
     def __init__(self):
@@ -41,15 +39,6 @@ class LidarSubscriber(Node):
 
     def lidar_callback(self, msg: LaserScan):
         # Initialisation de la figure Matplotlib pour le graphique en temps réel, ici pour être dans le même thread que l'utilisation de Matplotlib
-        # self.fig, self.ax = plt.subplots()
-        # self.points_scatter = self.ax.scatter([], [], color="blue")
-        # self.ax.set_xlabel("X")
-        # self.ax.set_ylabel("Y")
-        # self.ax.set_title("Visualisation des points Lidar")
-        # Définir les limites des axes X et Y
-        # self.ax.set_xlim(-400, 400)
-        # self.ax.set_ylim(-400, 400)
-        # Extraction des données de distances (ranges) du message LaserScan
         ranges = msg.ranges
 
         # Conversion des données en coordonnées cartésiennes (x, y) dans le repère absolu tel que (0;0) est le spawn de l'USV
@@ -70,10 +59,6 @@ class LidarSubscriber(Node):
         # Clusterisation avec DBSCAN si des données sont disponibles
         if len(lidar_data) > 0:
             lidar_data = np.array(lidar_data)
-            # self.points_scatter.set_offsets(lidar_data)
-            # self.fig.canvas.draw()
-            # self.fig.canvas.flush_events()
-            # plt.pause(0.001)
             eps = 1  # TODO régler les paramètres de DBSCAN
             min_samples = 4  # TODO régler les paramètres de DBSCAN
             dbscan = DBSCAN(eps=eps, min_samples=min_samples)
@@ -104,8 +89,6 @@ class LidarSubscriber(Node):
                 cluster.range = distance
                 cluster.x = central_point[0]
                 cluster.y = central_point[1]
-                self.lidar_cluster_publisher.publish(cluster)
                 self.get_logger().info(
                     f"Cluster {cluster_id:.2f}: pos = ({cluster.x:.2f};{cluster.y:.2f}) ; d = {distance:.2f}, abs_theta_deg : {cluster.absolute_theta:.2f} ; rel_theta_deg : {np.rad2deg(cluster.relative_theta):.2f}"
                 )  # DEBUG
-            print("\n\n")

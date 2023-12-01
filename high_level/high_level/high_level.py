@@ -54,7 +54,7 @@ class HighLevel(Node):
         self.path_finder.set_position(boat_x, boat_y)
         # TODO add moving obstacles
         # Compute path
-        path = self.path_finder.find_path(buoy_x, buoy_y)
+        path = self.path_finder.find_path((buoy_x, buoy_y))
         # Send the first point of the path to the controller
         self.trajectory_publisher.publish(path[1][0], path[1][1])
 
@@ -68,7 +68,7 @@ class HighLevel(Node):
         # Must be provided
         pass
 
-    def buoy_cb(self):
+    def buoy_receiver_cb(self):
         if self.phase == Phase.INIT:
             self.buoy_received = True
         pass
