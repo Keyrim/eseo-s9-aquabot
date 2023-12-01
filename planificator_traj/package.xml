@@ -4,7 +4,7 @@
   <name>planificator_traj</name>
   <version>0.0.0</version>
   <description>TODO: Package description</description>
-  <maintainer email="ecoulon@todo.todo">ecoulon</maintainer>
+  <maintainer email="clement.guais@reseau.eseo.fr">ecoulon</maintainer>
   <license>TODO: License declaration</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>

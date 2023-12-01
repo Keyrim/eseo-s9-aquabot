@@ -11,7 +11,7 @@ class BuoyReceiver:
             Point, TOPIC_BUOY, self.callback, 10)
 
     def callback(self, msg):
-        self.order = msg.order
+        self.point = msg
         self.node.buoy_receiver_cb()
 
     def get_buoy_pos(self):
