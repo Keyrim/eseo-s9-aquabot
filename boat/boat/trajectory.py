@@ -4,8 +4,8 @@ TOPIC_BOAT_TARGET = '/boat/controller/traj'
 
 class TrajectoryReceiver:
     def __init__(self, node):
-        self.x = -30
-        self.y = -150
+        self.x = 0
+        self.y = 0
         self.node = node
         self.subscription = node.create_subscription(
             BoatTrajectory, TOPIC_BOAT_TARGET, self.callback, 10)
