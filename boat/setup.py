@@ -20,7 +20,8 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'estimator = boat.estimator:main'
+            'estimator = boat.estimator:main',
+            'controller = boat.controller:main',
         ],
     },
 )

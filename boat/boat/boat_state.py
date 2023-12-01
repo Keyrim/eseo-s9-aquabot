@@ -34,6 +34,12 @@ class BoatStatePublisher:
         self.theta = 0
         self.vx = 0
         self.vy = 0
+        self.base_lat = None
+        self.base_lon = None
+
+    def set_base_lat_lon(self, base_lat, base_lon):
+        self.base_lat = base_lat
+        self.base_lon = base_lon
 
     def publish(self):
         msg = BoatState()
@@ -42,6 +48,8 @@ class BoatStatePublisher:
         msg.theta = float(self.theta)
         msg.vx = float(self.vx)
         msg.vy = float(self.vy)
+        msg.base_lat = float(self.base_lat)
+        msg.base_lon = float(self.base_lon)
         self.publisher_pos.publish(msg)
 
     def update_pos_and_speed(self, x, y, vx, vy):
