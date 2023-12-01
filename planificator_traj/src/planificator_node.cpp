@@ -62,7 +62,7 @@ private :
 
     // Infos Bateau
     double baseLat = 48.046300000000;
-    double baseLon = -4.976320000000; 
+    double baseLon = -4.976320000000;
     Point start = Point(-1000,-1000);
     Point initialVelocity = Point(0,0);
 
@@ -105,7 +105,7 @@ private :
         if (this->currentPhase == BUOY){
             this->target.x = buoy.x;
             this->target.y = buoy.y;
-        } 
+        }
     }
 
     void threatCallback(geometry_msgs::msg::Point threat) {
@@ -123,13 +123,13 @@ private :
             this->currentPhase = PATROL;
         }else if(v_currentPhase.data == static_cast<uint32_t>(3)){
             this->currentPhase = PURSUIT;
-        } 
+        }
     }
 
     void alliesCallback(geometry_msgs::msg::PoseArray allies) {
 
         std::vector<Obstacle *> l_alliesBoat = {};
-        
+
         for (int i = 0 ; i < (int)allies.poses.size() ; i++ ){
 
             geometry_msgs::msg::Pose pose = allies.poses[i];
@@ -157,7 +157,7 @@ private :
                         this->target = Point(200,200);
                     }else if(this->start.x > 150 && this->start.y > 150){
                         this->target = Point(200,-200);
-                    } 
+                    }
                 }
             }
 
@@ -172,8 +172,8 @@ private :
                 trajMsg.y = minPath.at(0).y;
 
                 trajPublisher->publish(trajMsg);
-            } 
-        }   
+            }
+        }
     }
 
 public:
@@ -190,7 +190,7 @@ public:
                 "/environment/threat_position", 10, std::bind(&TrajectoryPlanner::threatCallback, this, std::placeholders::_1));
 
             this->helpThreatSubscription = this->create_subscription<geometry_msgs::msg::Point>(
-                "/wamv/ais_sensor/ennemy_position ", 0.1, std::bind(&TrajectoryPlanner::threatCallback, this, std::placeholders::_1));
+                "/wamv/ais_sensor/ennemy_position", 0.1, std::bind(&TrajectoryPlanner::threatCallback, this, std::placeholders::_1));
 
             this->currentPhaseSubscription = this->create_subscription<std_msgs::msg::UInt32>(
                 "/vrx/patrolandfollow/current_phase", 10, std::bind(&TrajectoryPlanner::currentPhaseCallback, this, std::placeholders::_1));
@@ -198,7 +198,7 @@ public:
             this->alliesSubscription = this->create_subscription<geometry_msgs::msg::PoseArray>(
                 "/wamv/ais_sensor/allies_positions", 1, std::bind(&TrajectoryPlanner::alliesCallback, this, std::placeholders::_1));
 
-            this->trajPublisher = this->create_publisher<geometry_msgs::msg::Point>("/boat/controller/traj", 10); 
+            this->trajPublisher = this->create_publisher<geometry_msgs::msg::Point>("/boat/controller/traj", 10);
     }
 
     std::vector<Point> planificationTrajectoire(Point &start, Point &initial_velocity, const Point &goal,
@@ -240,11 +240,11 @@ public:
                     Point(current->position.x - DELTA + current->velocity.x, current->position.y - DELTA + current->velocity.y)
                 }) {
                 Point mutable_neighbor = neighbor;
-                if (isValidPoint(mutable_neighbor, obstacles) && isValidPoint(mutable_neighbor, obstaclesBateau)&& !isInPath(neighbor, path)) {  
-                    
+                if (isValidPoint(mutable_neighbor, obstacles) && isValidPoint(mutable_neighbor, obstaclesBateau)&& !isInPath(neighbor, path)) {
+
                     double restant_score_tentative = mutable_neighbor.distanceTo(goal);
 
-                    
+
                         if (path.size() >= 2) {
 
                             if (current->position.distanceTo(neighbor) < path.at(path.size()-2)->position.distanceTo(neighbor)) {
@@ -264,13 +264,13 @@ public:
                                 best_neighbor = neighbor;
                             }
                         }
-                        
-                    
+
+
                 }
             }
             if(best_neighbor != Point(-1000,1000)){
                 path.push_back(new NodeTraj(best_neighbor, best_neighbor.distanceTo(goal)));
-            } 
+            }
             i++;
         }
         while (!path.empty()) {
@@ -283,12 +283,12 @@ public:
 
     bool isValidPoint(Point &point, const std::vector<Obstacle *> &obstacles) {
         for (auto obs : obstacles) {
-            if (point.x >= (obs->position.x - obs->diameter) 
-                && point.x <= (obs->position.x + obs->diameter) 
-                && point.y >= (obs->position.y - obs->diameter) 
+            if (point.x >= (obs->position.x - obs->diameter)
+                && point.x <= (obs->position.x + obs->diameter)
+                && point.y >= (obs->position.y - obs->diameter)
                 && point.y <= (obs->position.y + obs->diameter)) {
                 return false;
-            }    
+            }
         }
         return true;
     }

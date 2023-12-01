@@ -1,6 +1,6 @@
 from environment_interfaces.msg import BoatTrajectory
 
-TOPIC_BOAT_TARGET = '/boat/controller/trajectory'
+TOPIC_BOAT_TARGET = '/boat/controller/traj'
 
 class TrajectoryReceiver:
     def __init__(self, node):
