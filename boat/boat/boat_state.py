@@ -25,6 +25,9 @@ class BoatStateReceiver:
         self.vy = msg.vy
         self.node.boat_state_receiver_cb()
 
+    def get_pos(self):
+        return (self.x, self.y)
+
 class BoatStatePublisher:
     def __init__(self, node):
         self.node = node
