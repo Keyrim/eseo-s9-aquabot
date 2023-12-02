@@ -119,16 +119,18 @@ class Environment(Node):
 
     def publish_threat_pos(self):
         self.threat_info_publisher.publish(self.threat_info) # Alerte le high level
+        self.get_logger().info(f"[threat_pos]: threat found at ({self.threat_info.x:.2f};{self.threat_info.y:.2f}) ; range = {self.threat_info.range:.2f}") # DEBUG
         if (self.state_tracker_receiver.get_phase() == Phase.PATROL
             or self.state_tracker_receiver.get_phase() == Phase.PURSUIT):
             alert = PoseStamped()
             alert.header.stamp = self.get_clock().now().to_msg()
             alert.pose.position.x, alert.pose.position.y = self.convert_xy_to_gps(self.threat_info.x, self.threat_info.y)
             self.threat_pos_alert_publisher.publish(alert) # Alerte le jeu
+            self.get_logger().info(f"[threat_pos]: alert sent at ({alert.pose.position.x:.2f};{alert.pose.position.y:.2f})")
     
     def state_tracker_cb(self):
         pass
-    
+
     def compute_threat_position_timer_cb(self):
         # Si on a la position exacte de la menace, on l'envoie directement
         if self.exact_threat_pos_tick >= 0:
@@ -223,8 +225,8 @@ class Environment(Node):
                     self.threat_info.y = cluster.y
                     self.threat_info.relative_angle = cluster.relative_theta
                     self.threat_info.range = math.hypot(self.usv_x - cluster.x, self.usv_y - cluster.y)
-                    self.threat_info_publisher.publish(self.threat_info)
-                    self.get_logger().info("Threat found with camera theta arbitration")
+                    self.publish_threat_pos()
+                    self.get_logger().info("Threat found with camera theta arbitration !")
         # else:
         #     self.get_logger().info("Threat found (only 1 item left)")
         #     # Si un seul objet reste, on considère que c'est la menace
