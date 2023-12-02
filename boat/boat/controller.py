@@ -76,11 +76,7 @@ class Controller(Node):
 
     def main(self):
         # If we are not working, we do nothing
-        if not self.working:
-            self.control(0, 0)
-            return
-        # If we are too close to the target, we just try to stop
-        if self.input_handler.e_d < MIN_DISTANCE:
+        if (not self.working) or (self.input_handler.e_d < MIN_DISTANCE):
             thrust = 10 * self.input_handler.boat_state_receiver.get_speed()
             self.control(thrust, 0)
             return
