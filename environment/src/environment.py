@@ -3,6 +3,7 @@ import math
 import numpy as np
 from rclpy.node import Node
 from geometry_msgs.msg import Point
+from geometry_msgs.msg import PoseStamped
 from sensor_msgs.msg import LaserScan
 from environment_interfaces.msg import ThreatInfo
 from environment_interfaces.msg import LidarCluster
@@ -10,7 +11,9 @@ from boat.boat_state import BoatStateReceiver
 from src.image_subscriber import ImageSubscriber
 from src.buoy_pinger_subscriber import BuoyPingerSubscriber
 from src.allies_subscriber import AlliesPositionSubscriber
+from src.exact_threat_position_subscriber import ExactThreatPositionSubscriber
 from sklearn.cluster import DBSCAN
+from high_level.state_tracker import StateTrackerReceiver, Phase
 
 class Obstacles:
     def __init__(self, x, y, radius):
@@ -48,33 +51,44 @@ class Environment(Node):
             ThreatInfo, "/environment/threat_info",
             10
         )
-        self.debug_lidar_publisher = self.create_publisher(
-            LidarCluster,
-            "/environment/lidar_debug",
+        self.threat_pos_alert_publisher = self.create_publisher(
+            PoseStamped,
+            "/vrx/patrolandfollow/alert_position",
             10
         )
+        # self.debug_lidar_publisher = self.create_publisher(
+        #     LidarCluster,
+        #     "/environment/lidar_debug",
+        #     10
+        # )
+
         # Subscribers
         self.threat_image_subscriber = ImageSubscriber(self)
         self.boat_state_receiver = BoatStateReceiver(self)
         self.buoy_pinger_subscriber = BuoyPingerSubscriber(self)
         self.allies_position_subscriber = AlliesPositionSubscriber(self)
-
+        self.exact_threat_pos_subscriber = ExactThreatPositionSubscriber(self)
+        self.state_tracker_receiver = StateTrackerReceiver(self)
         # Class attributes
         # CONSTANTS
         self.base_lat = 48.046300000000
         self.base_lon = -4.976320000000
         self.keepout_radius = 15
         self.obstacles = [
+            Obstacles(-157, 0, 35 + self.keepout_radius),
+            Obstacles(-147, -20, 35 + self.keepout_radius),
+            Obstacles(120, 130, 35 + self.keepout_radius),
+            Obstacles(90, 150, 35 + self.keepout_radius),
+            Obstacles(100, 170, 35 + self.keepout_radius),
+            Obstacles(110, 150, 30 + self.keepout_radius),
             Obstacles(120, -50, 25 + self.keepout_radius),
-            Obstacles(-152, -6, 50 + self.keepout_radius),
-            Obstacles(110, 130, 50 + self.keepout_radius),
             Obstacles(12, -102, 25 + self.keepout_radius),
-            Obstacles(92, 170, 25 + self.keepout_radius),
             Obstacles(-92, 176, 30 + self.keepout_radius),
             Obstacles(-40, 220, 30 + self.keepout_radius),
             Obstacles(-44, -95, 30 + self.keepout_radius),
             Obstacles(-30, -150, 30 + self.keepout_radius),
         ]
+        
         # USV info
         self.usv_x = 0.0
         self.usv_y = 0.0
@@ -87,15 +101,48 @@ class Environment(Node):
         self.buoy_pos_xy = Point()
         # Threat info
         self.threat_info = ThreatInfo()
+        self.exact_threat_pos = Point()
+        self.exact_threat_pos_tick = 0 # Counter pour savoir si la pos exacte menace est périmée
+        self.exact_threat_pos_tick_max = 20 # 2 secondes, timer appelé à 10 Hz
+        # self.image_threat_tick = 0 # Counter pour savoir si la menace vue par la caméra est périmée
+        # self.image_threat_tick_max = 20 # 10 secondes, timer appelé à 10 Hz
         # Lidar clusters
         self.lidar_objects = []
-
 
     def are_near(self, x1, y1, x2, y2, threshold: float):
         distance = math.hypot(x2 - x1, y2 - y1)
         return distance < threshold
 
+    def exact_threat_pos_cb(self):
+        self.exact_threat_pos.x, self.exact_threat_pos.y = self.convert_gps_to_xy(self.exact_threat_pos_subscriber.exact_threat_lat, self.exact_threat_pos_subscriber.exact_threat_lon)
+        self.exact_threat_pos_tick = self.exact_threat_pos_tick_max # Reset ticks
+
+    def publish_threat_pos(self):
+        self.threat_info_publisher.publish(self.threat_info) # Alerte le high level
+        if (self.state_tracker_receiver.get_phase() == Phase.PATROL
+            or self.state_tracker_receiver.get_phase() == Phase.PURSUIT):
+            alert = PoseStamped()
+            alert.header.stamp = self.get_clock().now().to_msg()
+            alert.pose.position.x, alert.pose.position.y = self.convert_xy_to_gps(self.threat_info.x, self.threat_info.y)
+            self.threat_pos_alert_publisher.publish(alert) # Alerte le jeu
+    
+    def state_tracker_cb(self):
+        pass
+    
     def compute_threat_position_timer_cb(self):
+        # Si on a la position exacte de la menace, on l'envoie directement
+        if self.exact_threat_pos_tick >= 0:
+            self.exact_threat_pos_tick -= 1
+            self.threat_info.is_found = True
+            self.threat_info.x = self.exact_threat_pos.x
+            self.threat_info.y = self.exact_threat_pos.y
+            self.threat_info.range = math.hypot(self.usv_x - self.exact_threat_pos.x, self.usv_y - self.exact_threat_pos.y)
+            self.threat_info.relative_angle = math.atan2(self.exact_threat_pos.y - self.usv_y, self.exact_threat_pos.x - self.usv_x)
+            self.publish_threat_pos()
+            return
+        
+        #################################################################################################
+        # Si on a pas la position exacte de la menace, on essaye de la calculer
         lidar_objects = self.lidar_objects.copy()
         self.lidar_objects.clear()
         threshold = 5  # Seuil de distance
