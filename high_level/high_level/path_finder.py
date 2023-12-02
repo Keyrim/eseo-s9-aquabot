@@ -1,7 +1,9 @@
 import heapq
 from matplotlib import pyplot as plt
 
-KEEPOUT_RADIUS = 15
+KEEPOUT_RADIUS = -10
+
+target = (-200, 0)
 
 def get_obstacles():
     obstacles = [
@@ -19,7 +21,7 @@ def get_obstacles():
 
 class PathFinder:
 
-    GRID_SIZE = 20
+    GRID_SIZE = 2
 
     def __init__(self, fix_obstacles = []):
         self.current_pos = (0, 0)
@@ -67,6 +69,11 @@ class PathFinder:
         target_x, target_y = target_pos
         target_pos = self.get_scaled_down(target_x, target_y)
         obstacles = self.fix_obstacles + self.moveable_obstacles
+        # Check if the target is within any of the obstacles
+        for obstacle in obstacles:
+            ox, oy, radius = obstacle
+            if (target_pos[0] - ox) ** 2 + (target_pos[1] - oy) ** 2 < radius ** 2:
+                return []
         astar = AStar(self.current_pos, target_pos, obstacles)
         points =  astar.search()
         # Scale up the points from the grid
@@ -137,7 +144,7 @@ window_size = 300
 if __name__ == '__main__':
     path_finder = PathFinder(get_obstacles())
     path_finder.set_position(0, 0)  # Set current position
-    path = path_finder.find_path((-200, -5))
+    path = path_finder.find_path(target)
     # Plot the path
     if len(path) != 0:
         print(path[0])
