@@ -23,9 +23,11 @@ class ControllerModeReceiver:
 class ControllerModePublisher:
     def __init__(self, node):
         self.node = node
+        self.mode = ControllerMode.DISABLED
         self.publisher = node.create_publisher(Int32, TOPIC_CONTROLLER_MODE, 10)
 
     def publish(self, mode: ControllerMode):
         msg = Int32()
+        self.mode = mode
         msg.data = mode.value
         self.publisher.publish(msg)
