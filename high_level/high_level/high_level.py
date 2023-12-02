@@ -10,7 +10,6 @@ from boat.controller_mode import ControllerModePublisher, ControllerMode
 from high_level.obstacle import get_obstacles
 from high_level.graph_plotter import GraphPlotter
 from high_level.threat_info import ThreatInfoReceiver
-from environment.environment.alies_subscriber import AliesSubscriber
 
 
 PLOT_GRAPH = False
