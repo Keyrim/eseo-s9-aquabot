@@ -10,7 +10,7 @@ from high_level.obstacle import get_obstacles
 from high_level.graph_plotter import GraphPlotter
 
 
-PLOT_GRAPH = True
+PLOT_GRAPH = False
 PLOT_GRAPH_PERIOD_S = 0.1
 
 
