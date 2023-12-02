@@ -1,13 +1,13 @@
 import rclpy
 import math
 import numpy as np
-from geometry_msgs.msg import Point
 from rclpy.node import Node
+from geometry_msgs.msg import Point
 from sensor_msgs.msg import LaserScan
-from src.image_subscriber import ImageSubscriber
 from environment_interfaces.msg import ThreatInfo
 from environment_interfaces.msg import LidarCluster
 from boat.boat_state import BoatStateReceiver
+from src.image_subscriber import ImageSubscriber
 from src.buoy_pinger_subscriber import BuoyPingerSubscriber
 from src.allies_subscriber import AlliesPositionSubscriber
 from sklearn.cluster import DBSCAN
@@ -98,7 +98,7 @@ class Environment(Node):
     def compute_threat_position_timer_cb(self):
         lidar_objects = self.lidar_objects.copy()
         self.lidar_objects.clear()
-        threshold = 1  # Seuil de distance
+        threshold = 5  # Seuil de distance
         to_remove = set()
 
         # Supprimer les groupes de points proches les uns des autres à un seuil de distance
@@ -111,7 +111,10 @@ class Environment(Node):
         # Supprimer les éléments identifiés à supprimer
         lidar_objects = [cluster for k, cluster in enumerate(lidar_objects) if k not in to_remove]
         to_remove.clear() # Clear pour réutiliser
-
+        if len(lidar_objects) == 0:
+            self.threat_info.is_found = False
+            return
+        ####################################################################################################
         # Supprimer les groupes de points proches de la bouée, des alliés et des obstacles
         for l, cluster in enumerate(lidar_objects):
             # Marqueur pour savoir si on doit supprimer ce groupe
@@ -153,30 +156,31 @@ class Environment(Node):
         lidar_objects = [cluster for i, cluster in enumerate(lidar_objects) if i not in to_remove]
         to_remove.clear()
 
-        for cluster in lidar_objects: # DEBUG
-            self.debug_lidar_publisher.publish(cluster) # DEBUG
+        ####################################################################################################
+        # for cluster in lidar_objects: # DEBUG
+        #     self.debug_lidar_publisher.publish(cluster) # DEBUG
 
         # S'il n'y a plus d'objets, on n'a pas trouvé la menace
         if len(lidar_objects) == 0:
             self.threat_info.is_found = False
             return
 
-        # Si plusieurs objets restent, on regarde ce que voit la caméra
-        if len(lidar_objects) > 1:
-            if self.threat_camera.in_is_found is True:
-                # Si la caméra voit la menace, on regarde l'angle de la menace vue par la caméra
-                for i, cluster in enumerate(lidar_objects):
-                    # self.get_logger().info(f"cluster_theta: {cluster.relative_theta:.2f} ; camera_theta: {self.threat_camera.in_rel_theta:.2f}")
-                    # Le "0" du Lidar est à l'arrière du bateau et le "0" de la caméra est à l'avant du bateau
-                    if abs(cluster.relative_theta - (self.threat_camera.in_rel_theta + math.pi)) < 0.31: # 0.31 rad ~ 5 % d'erreur
-                        self.threat_info.is_found = True
-                        (self.threat_info.lon, self.threat_info.lat) = self.convert_gps_to_xy(cluster.x, cluster.y)
-                        self.threat_info.x = cluster.x
-                        self.threat_info.y = cluster.y
-                        self.threat_info.relative_angle = cluster.relative_theta
-                        self.threat_info.range = math.hypot(self.usv_x - cluster.x, self.usv_y - cluster.y)
-                        self.threat_info_publisher.publish(self.threat_info)
-                        self.get_logger().info("Threat found with camera theta arbitration")
+        if self.threat_camera.in_is_found is True:
+            # Si la caméra voit la menace, on regarde l'angle de la menace vue par la caméra
+            for i, cluster in enumerate(lidar_objects):
+                self.get_logger().info(f"cluster : ({cluster.x:.2f};{cluster.y:.2f}) cluster_theta: {math.degrees(cluster.relative_theta):.2f} ; camera_theta {math.degrees(self.threat_camera.in_rel_theta):.2f} + usv_theta {math.degrees(self.usv_theta):.2f} = : {math.degrees(self.threat_camera.in_rel_theta + self.usv_theta):.2f}")
+                # camera_offset = 0
+                # camera_deg = np.unwrap([math.degrees(self.threat_camera.in_rel_theta - self.usv_theta)])
+                # camera_deg = np.unwrap(camera_deg + math.pi/2)
+                if abs(cluster.relative_theta - (self.threat_camera.in_rel_theta + self.usv_theta)) < 0.31: # 0.31 rad ~ 5 % d'erreur
+                    self.threat_info.is_found = True
+                    (self.threat_info.lon, self.threat_info.lat) = self.convert_gps_to_xy(cluster.x, cluster.y)
+                    self.threat_info.x = cluster.x
+                    self.threat_info.y = cluster.y
+                    self.threat_info.relative_angle = cluster.relative_theta
+                    self.threat_info.range = math.hypot(self.usv_x - cluster.x, self.usv_y - cluster.y)
+                    self.threat_info_publisher.publish(self.threat_info)
+                    self.get_logger().info("Threat found with camera theta arbitration")
         # else:
         #     self.get_logger().info("Threat found (only 1 item left)")
         #     # Si un seul objet reste, on considère que c'est la menace
@@ -223,17 +227,16 @@ class Environment(Node):
                     cluster_points, axis=0
                 )  # Point central du cluster
 
-                # Calcul de la distance entre votre position et le point central
+                # Calcul de la distance entre l'USV et le point central
                 distance = np.linalg.norm(
                     central_point - np.array([self.usv_x, self.usv_y])
                 )
 
-                # Calcul de l'angle entre le point central et l'origine du repère
-                theta_rad = np.arctan2(central_point[1], central_point[0])
+                # Calcul de l'angle entre le point l'USV et le point central
+                theta_rad = np.arctan2(central_point[1] - self.usv_y, central_point[0] - self.usv_x)
 
                 cluster = LidarCluster()
-                cluster.relative_theta = theta_rad - self.usv_theta
-                cluster.absolute_theta = theta_rad
+                cluster.relative_theta = theta_rad
                 cluster.range = distance
                 cluster.x = central_point[0]
                 cluster.y = central_point[1]
