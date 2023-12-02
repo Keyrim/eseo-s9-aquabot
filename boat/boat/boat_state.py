@@ -11,6 +11,8 @@ class BoatStateReceiver:
         self.theta = 0
         self.vx = 0
         self.vy = 0
+        self.base_lat = 0
+        self.base_lon = 0
         self.subscription = node.create_subscription(
             BoatState, TOPIC_BOAT_STATE, self.callback, 10)
 
@@ -23,10 +25,15 @@ class BoatStateReceiver:
         self.theta = msg.theta
         self.vx = msg.vx
         self.vy = msg.vy
+        self.base_lat = msg.base_lat
+        self.base_lon = msg.base_lon
         self.node.boat_state_receiver_cb()
 
     def get_pos(self):
         return (self.x, self.y)
+
+    def get_theta(self):
+        return self.theta
 
 class BoatStatePublisher:
     def __init__(self, node):
