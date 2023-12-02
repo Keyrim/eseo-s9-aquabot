@@ -58,7 +58,7 @@ class Environment(Node):
         self.boat_state_receiver = BoatStateReceiver(self)
         self.buoy_pinger_subscriber = BuoyPingerSubscriber(self)
         self.allies_position_subscriber = AlliesPositionSubscriber(self)
-        
+
         # Class attributes
         # CONSTANTS
         self.base_lat = 48.046300000000
@@ -89,12 +89,12 @@ class Environment(Node):
         self.threat_info = ThreatInfo()
         # Lidar clusters
         self.lidar_objects = []
-        
+
 
     def are_near(self, x1, y1, x2, y2, threshold: float):
         distance = math.hypot(x2 - x1, y2 - y1)
         return distance < threshold
-    
+
     def compute_threat_position_timer_cb(self):
         lidar_objects = self.lidar_objects.copy()
         self.lidar_objects.clear()
@@ -150,7 +150,7 @@ class Environment(Node):
             if should_remove:
                 to_remove.add(l)
                 continue
-        
+
         # Supprimer les éléments identifiés à supprimer
         # self.get_logger().info(f"[threat_pos]: removed {len(to_remove)} clusters out of {len(lidar_objects)}, {len(lidar_objects) - len(to_remove)} clusters remaining") # DEBUG
         lidar_objects = [cluster for i, cluster in enumerate(lidar_objects) if i not in to_remove]
@@ -159,7 +159,7 @@ class Environment(Node):
         ####################################################################################################
         # for cluster in lidar_objects: # DEBUG
         #     self.debug_lidar_publisher.publish(cluster) # DEBUG
-        
+
         # S'il n'y a plus d'objets, on n'a pas trouvé la menace
         if len(lidar_objects) == 0:
             self.threat_info.is_found = False

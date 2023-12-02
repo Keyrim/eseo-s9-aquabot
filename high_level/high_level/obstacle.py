@@ -2,7 +2,7 @@ KEEPOUT_RADIUS = 10
 
 def get_obstacles():
     obstacles = [
-        [-120, -50, 25 + KEEPOUT_RADIUS],
+        [120, -50, 25 + KEEPOUT_RADIUS],
         [-152, -6, 50 + KEEPOUT_RADIUS],
         [110, 130, 50 + KEEPOUT_RADIUS],
         [12, -102, 25 + KEEPOUT_RADIUS],

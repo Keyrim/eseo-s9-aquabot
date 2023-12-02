@@ -7,6 +7,11 @@ from boat.boat_state import BoatStateReceiver
 from boat.trajectory import TrajectoryPublisher
 from boat.controller_mode import ControllerModePublisher, ControllerMode
 from high_level.obstacle import get_obstacles
+from high_level.graph_plotter import GraphPlotter
+
+
+PLOT_GRAPH = True
+PLOT_GRAPH_PERIOD_S = 0.1
 
 
 class HighLevel(Node):
@@ -20,6 +25,16 @@ class HighLevel(Node):
         self.path_finder = PathFinder(get_obstacles())
         self.timer = self.create_timer(0.5, self.main)
         self.phase: Phase = Phase.INIT
+
+        if PLOT_GRAPH:
+            self.graph_plotter = GraphPlotter()
+            self.timer_plot_graph = self.create_timer(
+                PLOT_GRAPH_PERIOD_S,
+                self.graph_plotter.update_plot
+            )
+            self.graph_plotter.show()
+            self.graph_plotter.set_points([(0, 0)])
+            self.graph_plotter.update_plot()
 
         # Logic flags
         self.buoy_received = False
@@ -58,6 +73,11 @@ class HighLevel(Node):
         # TODO add moving obstacles
         # Compute path
         path = self.path_finder.find_path((buoy_x, buoy_y))
+        if not path:
+            self.get_logger().error('No path found')
+            self.graph_plotter.set_points([(0, 0)])
+        else :
+            self.graph_plotter.set_points(path)
         # Send the first point of the path to the controller
         self.trajectory_publisher.publish(path[1][0], path[1][1])
 
