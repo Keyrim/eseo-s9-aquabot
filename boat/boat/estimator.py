@@ -16,7 +16,7 @@ class Estimator(Node):
 
     def publish_state(self):
         # log current x y position with 0 decimals and angle converted from rad to deg
-        self.get_logger().info('x: %f, y: %f, theta: %f' % (self.boat_state_publisher.x, self.boat_state_publisher.y, self.boat_state_publisher.theta*180/math.pi))
+        # self.get_logger().info('x: %f, y: %f, theta: %f' % (self.boat_state_publisher.x, self.boat_state_publisher.y, self.boat_state_publisher.theta*180/math.pi))
         if self.is_base_lat_lon_set:
             self.boat_state_publisher.publish()
 

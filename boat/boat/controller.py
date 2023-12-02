@@ -48,9 +48,9 @@ class Controller(Node):
 
     def main(self):
         # Log error and control signal and real e d with 2 decimals
-        self.get_logger().info('e_d: %.2f, e_theta: %.2f, u_d: %.2f, u_theta: %.2f' % (
-            self.input_handler.e_d, self.input_handler.e_theta,
-            self.pid_d.u, self.pid_theta.u))
+        # self.get_logger().info('e_d: %.2f, e_theta: %.2f, u_d: %.2f, u_theta: %.2f' % (
+        #     self.input_handler.e_d, self.input_handler.e_theta,
+        #     self.pid_d.u, self.pid_theta.u))
         # If we are not working, we do nothing
         if not self.working:
             return
