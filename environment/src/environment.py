@@ -37,16 +37,22 @@ class Environment(Node):
             10,
         )
         self.buoy_pos_publisher = self.create_publisher(
-            Point, "/environment/buoy_pos", 10
+            Point, "/environment/buoy_pos",
+            10
         )
         self.compute_threat_position_timer = self.create_timer(
-            0.25, 
+            0.1,
             self.compute_threat_position_timer_cb
         )
         self.threat_info_publisher = self.create_publisher(
-            ThreatInfo, "/environment/threat_info", 10
+            ThreatInfo, "/environment/threat_info",
+            10
         )
-        
+        self.debug_lidar_publisher = self.create_publisher(
+            LidarCluster,
+            "/environment/lidar_debug",
+            10
+        )
         # Subscribers
         self.threat_image_subscriber = ImageSubscriber(self)
         self.boat_state_receiver = BoatStateReceiver(self)
@@ -57,9 +63,9 @@ class Environment(Node):
         # CONSTANTS
         self.base_lat = 48.046300000000
         self.base_lon = -4.976320000000
-        self.keepout_radius = 5
+        self.keepout_radius = 15
         self.obstacles = [
-            Obstacles(-120, -50, 25 + self.keepout_radius),
+            Obstacles(120, -50, 25 + self.keepout_radius),
             Obstacles(-152, -6, 50 + self.keepout_radius),
             Obstacles(110, 130, 50 + self.keepout_radius),
             Obstacles(12, -102, 25 + self.keepout_radius),
@@ -85,11 +91,13 @@ class Environment(Node):
         self.lidar_objects = []
         
 
-    def are_near(self, x1, x2, y1, y2, threshold: float):
-        return math.hypot(x1 - x2, y1 - y2) < threshold
+    def are_near(self, x1, y1, x2, y2, threshold: float):
+        distance = math.hypot(x2 - x1, y2 - y1)
+        return distance < threshold
     
     def compute_threat_position_timer_cb(self):
         lidar_objects = self.lidar_objects.copy()
+        self.lidar_objects.clear()
         threshold = 1  # Seuil de distance
         to_remove = set()
 
@@ -101,28 +109,53 @@ class Environment(Node):
                     to_remove.add(j)
 
         # Supprimer les éléments identifiés à supprimer
-        lidar_objects = [cluster for i, cluster in enumerate(lidar_objects) if i not in to_remove]
+        lidar_objects = [cluster for k, cluster in enumerate(lidar_objects) if k not in to_remove]
         to_remove.clear() # Clear pour réutiliser
 
         # Supprimer les groupes de points proches de la bouée, des alliés et des obstacles
-        for i, cluster in enumerate(lidar_objects):
+        for l, cluster in enumerate(lidar_objects):
+            # Marqueur pour savoir si on doit supprimer ce groupe
+            should_remove = False
+
             # Supprimer le groupe si proche de la bouée
             if self.are_near(cluster.x, cluster.y, self.buoy_pos_xy.x, self.buoy_pos_xy.y, threshold):
-                to_remove.add(i)
+                should_remove = True
+
+            # Si le groupe est proche de la bouée, passe au groupe suivant
+            if should_remove:
+                to_remove.add(l)
+                continue
 
             # Supprimer le groupe s'il est proche d'un allié
             for ally in self.allies_pos_xy:
                 if self.are_near(cluster.x, cluster.y, ally[0], ally[1], threshold):
-                    to_remove.add(i)
+                    should_remove = True
+                    break  # Sort de la boucle si un allié est proche
+
+            if should_remove:
+                to_remove.add(l)
+                continue
 
             # Supprimer le groupe s'il est proche d'un obstacle (à définir)
             for obstacle in self.obstacles:
                 if self.are_near(cluster.x, cluster.y, obstacle.x, obstacle.y, obstacle.radius):
-                    to_remove.add(i)
+                    should_remove = True
+                    break  # Sort de la boucle si un obstacle est proche
+                # else:
+                    # self.get_logger().info(f"[threat_pos]: cluster ({cluster.x:.2f};{cluster.y:.2f}) is not near obstacle ({obstacle.x:.2f};{obstacle.y:.2f})")
+
+            if should_remove:
+                to_remove.add(l)
+                continue
         
         # Supprimer les éléments identifiés à supprimer
+        # self.get_logger().info(f"[threat_pos]: removed {len(to_remove)} clusters out of {len(lidar_objects)}, {len(lidar_objects) - len(to_remove)} clusters remaining") # DEBUG
         lidar_objects = [cluster for i, cluster in enumerate(lidar_objects) if i not in to_remove]
+        to_remove.clear()
 
+        for cluster in lidar_objects: # DEBUG
+            self.debug_lidar_publisher.publish(cluster) # DEBUG
+        
         # S'il n'y a plus d'objets, on n'a pas trouvé la menace
         if len(lidar_objects) == 0:
             self.threat_info.is_found = False
@@ -133,7 +166,7 @@ class Environment(Node):
             if self.threat_camera.in_is_found is True:
                 # Si la caméra voit la menace, on regarde l'angle de la menace vue par la caméra
                 for i, cluster in enumerate(lidar_objects):
-                    self.get_logger().info(f"cluster_theta: {cluster.relative_theta:.2f} ; camera_theta: {self.threat_camera.in_rel_theta:.2f}")
+                    # self.get_logger().info(f"cluster_theta: {cluster.relative_theta:.2f} ; camera_theta: {self.threat_camera.in_rel_theta:.2f}")
                     # Le "0" du Lidar est à l'arrière du bateau et le "0" de la caméra est à l'avant du bateau
                     if abs(cluster.relative_theta - (self.threat_camera.in_rel_theta + math.pi)) < 0.31: # 0.31 rad ~ 5 % d'erreur
                         self.threat_info.is_found = True
@@ -144,19 +177,18 @@ class Environment(Node):
                         self.threat_info.range = math.hypot(self.usv_x - cluster.x, self.usv_y - cluster.y)
                         self.threat_info_publisher.publish(self.threat_info)
                         self.get_logger().info("Threat found with camera theta arbitration")
-        else:
-            self.get_logger().info("Threat found (only 1 item left)")
-            # Si un seul objet reste, on considère que c'est la menace
-            self.threat_info.is_found = True
-            (self.threat_info.lon, self.threat_info.lat) = self.convert_gps_to_xy(lidar_objects[0].x, lidar_objects[0].y)
-            self.threat_info.x = lidar_objects[0].x
-            self.threat_info.y = lidar_objects[0].y
-            self.threat_info.relative_angle = lidar_objects[0].relative_theta
-            self.threat_info.range = math.hypot(self.usv_x - lidar_objects[0].x, self.usv_y - lidar_objects[0].y)
-            self.threat_info_publisher.publish(self.threat_info)
+        # else:
+        #     self.get_logger().info("Threat found (only 1 item left)")
+        #     # Si un seul objet reste, on considère que c'est la menace
+        #     self.threat_info.is_found = True
+        #     (self.threat_info.lon, self.threat_info.lat) = self.convert_gps_to_xy(lidar_objects[0].x, lidar_objects[0].y)
+        #     self.threat_info.x = lidar_objects[0].x
+        #     self.threat_info.y = lidar_objects[0].y
+        #     self.threat_info.relative_angle = lidar_objects[0].relative_theta
+        #     self.threat_info.range = math.hypot(self.usv_x - lidar_objects[0].x, self.usv_y - lidar_objects[0].y)
+        #     self.threat_info_publisher.publish(self.threat_info)
 
     def lidar_callback(self, msg: LaserScan):
-        # Initialisation de la figure Matplotlib pour le graphique en temps réel, ici pour être dans le même thread que l'utilisation de Matplotlib
         ranges = msg.ranges
 
         # Conversion des données en coordonnées cartésiennes (x, y) dans le repère absolu tel que (0;0) est le spawn de l'USV
@@ -165,9 +197,7 @@ class Environment(Node):
         )  # Angles d'acquisition
         lidar_data = []
         for i, distance in enumerate(ranges):
-            if not np.isinf(distance) and (
-                distance > 0.1
-            ):  # Travail dans le range 10cm-130m
+            if not np.isinf(distance):
                 rel_x = self.usv_x + (distance * np.cos(angles[i] + self.usv_theta))
                 rel_y = self.usv_y + (distance * np.sin(angles[i] + self.usv_theta))
                 lidar_data.append(
@@ -177,8 +207,8 @@ class Environment(Node):
         # Clusterisation avec DBSCAN si des données sont disponibles
         if len(lidar_data) > 0:
             lidar_data = np.array(lidar_data)
-            eps = 1  # TODO régler les paramètres de DBSCAN
-            min_samples = 4  # TODO régler les paramètres de DBSCAN
+            eps = 0.5  # TODO régler les paramètres de DBSCAN
+            min_samples = 5  # TODO régler les paramètres de DBSCAN
             dbscan = DBSCAN(eps=eps, min_samples=min_samples)
             clusters = dbscan.fit_predict(lidar_data)
 
@@ -207,9 +237,9 @@ class Environment(Node):
                 cluster.range = distance
                 cluster.x = central_point[0]
                 cluster.y = central_point[1]
-                self.get_logger().info(
-                    f"Cluster {cluster_id:.2f}: pos = ({cluster.x:.2f};{cluster.y:.2f}) ; d = {distance:.2f}, abs_theta_deg : {cluster.absolute_theta:.2f} ; rel_theta_deg : {np.rad2deg(cluster.relative_theta):.2f}"
-                )  # DEBUG
+                # self.get_logger().info(
+                #     f"[Lidar cluster] {cluster_id:.2f}: pos = ({cluster.x:.2f};{cluster.y:.2f}) ; d = {distance:.2f}, abs_theta_deg : {cluster.absolute_theta:.2f} ; rel_theta_deg : {np.rad2deg(cluster.relative_theta):.2f}"
+                # )  # DEBUG
                 self.lidar_objects.append(cluster)
 
     def image_listener_threat_cb(self):
