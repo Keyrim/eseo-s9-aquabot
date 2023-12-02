@@ -37,7 +37,7 @@ class PathFinder:
 
     def get_scaled_down(self, x, y):
         """Scale down the coordinates to the grid."""
-        return x // self.GRID_SIZE, y // self.GRID_SIZE
+        return round(x / self.GRID_SIZE), round(y / self.GRID_SIZE)
 
     def get_scaled_up(self, x, y):
         """Scale up the coordinates from the grid."""
@@ -45,9 +45,9 @@ class PathFinder:
 
     def add_moveable_obstacle(self, x, y, radius):
         """Add an obstacle represented by its center (x, y) and radius."""
-        x = x // self.GRID_SIZE
-        y = y // self.GRID_SIZE
-        radius = (radius // self.GRID_SIZE)
+        x = round(x / self.GRID_SIZE)
+        y = round(y / self.GRID_SIZE)
+        radius = round(radius / self.GRID_SIZE)
         self.moveable_obstacles.append((x, y, radius))
 
     def delete_all_moveable_obstacle(self):
@@ -57,11 +57,23 @@ class PathFinder:
         for obstacle in list_obstacle:
             self.add_fix_obstacle(obstacle[0], obstacle[1], obstacle[2])
 
+    def check_if_target_valid(self, target_pos):
+        """Check if the target position is valid."""
+        target_x, target_y = target_pos
+        target_pos = self.get_scaled_down(target_x, target_y)
+        obstacles = self.fix_obstacles + self.moveable_obstacles
+        # Check if the target is within any of the obstacles
+        for obstacle in obstacles:
+            ox, oy, radius = obstacle
+            if (target_pos[0] - ox) ** 2 + (target_pos[1] - oy) ** 2 < radius ** 2:
+                return False
+        return True
+
     def add_fix_obstacle(self, x, y, radius):
         """Add an obstacle represented by its center (x, y) and radius."""
-        x = x // self.GRID_SIZE
-        y = y // self.GRID_SIZE
-        radius = (radius // self.GRID_SIZE)
+        x = round(x / self.GRID_SIZE)
+        y = round(y / self.GRID_SIZE)
+        radius = round(radius / self.GRID_SIZE)
         self.fix_obstacles.append((x, y, radius))
 
     def find_path(self, target_pos):
@@ -70,10 +82,8 @@ class PathFinder:
         target_pos = self.get_scaled_down(target_x, target_y)
         obstacles = self.fix_obstacles + self.moveable_obstacles
         # Check if the target is within any of the obstacles
-        for obstacle in obstacles:
-            ox, oy, radius = obstacle
-            if (target_pos[0] - ox) ** 2 + (target_pos[1] - oy) ** 2 < radius ** 2:
-                return []
+        if not self.check_if_target_valid(target_pos):
+            return []
         astar = AStar(self.current_pos, target_pos, obstacles)
         points =  astar.search()
         # Scale up the points from the grid
@@ -147,8 +157,8 @@ if __name__ == '__main__':
     path = path_finder.find_path(target)
     # Plot the path
     if len(path) != 0:
-        print(path[0])
-        plt.plot([x for x, y in path], [y for x, y in path])
+        # Show the points of the path on the graph
+        plt.scatter([x for x, y in path], [y for x, y in path], color='b')
     # Plot the obstacles
     for x, y, radius in get_obstacles():
         circle = plt.Circle((x, y), radius, color='r')

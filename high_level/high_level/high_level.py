@@ -26,6 +26,10 @@ class HighLevel(Node):
         self.timer = self.create_timer(0.5, self.main)
         self.phase: Phase = Phase.INIT
 
+        self.last_valid_buoy_pos = (0, 0)
+        self.buoy_is_valid_graph = False
+        self.buoy_path = []
+
         if PLOT_GRAPH:
             self.graph_plotter = GraphPlotter()
             self.timer_plot_graph = self.create_timer(
@@ -66,20 +70,39 @@ class HighLevel(Node):
 
     def buoy(self):
         # Get variables
-        buoy_x, buoy_y = self.buoy_receiver.get_buoy_pos()
         boat_x, boat_y = self.boat_state.get_pos()
+        buoy_x, buoy_y = self.last_valid_buoy_pos
         # Config path finder
         self.path_finder.set_position(boat_x, boat_y)
         # TODO add moving obstacles
         # Compute path
         path = self.path_finder.find_path((buoy_x, buoy_y))
-        if not path:
+        # no path found
+        if len(path) == 0:
             self.get_logger().error('No path found')
-            self.graph_plotter.set_points([(0, 0)])
+            if self.buoy_is_valid_graph:
+                self.publish_target_from_buoy_path()
+            if PLOT_GRAPH:
+                self.graph_plotter.set_points([(0, 0)])
+
+        elif len(path) == 1:
+            self.get_logger().info('Target reached')
+            if PLOT_GRAPH:
+                self.graph_plotter.set_points([(0, 0)])
+            self.trajectory_publisher.publish(buoy_x, buoy_y)
         else :
-            self.graph_plotter.set_points(path)
-        # Send the first point of the path to the controller
-        self.trajectory_publisher.publish(path[1][0], path[1][1])
+            if PLOT_GRAPH:
+                self.graph_plotter.set_points(path)
+            # Save the path for the buoyz
+            self.buoy_is_valid_graph = True
+            self.buoy_path = path
+            self.publish_target_from_buoy_path()
+
+    def publish_target_from_buoy_path(self):
+        if len(self.buoy_path) == 0:
+            self.get_logger().error('No path found')
+            return
+        self.trajectory_publisher.publish(self.buoy_path[1][0], self.buoy_path[1][1])
 
     def patrol(self):
         pass
@@ -92,8 +115,10 @@ class HighLevel(Node):
         pass
 
     def buoy_receiver_cb(self):
-        if self.phase == Phase.INIT:
-            self.buoy_received = True
+        if self.path_finder.check_if_target_valid(self.buoy_receiver.get_buoy_pos()):
+            if self.phase == Phase.INIT:
+                self.buoy_received = True
+            self.last_valid_buoy_pos = self.buoy_receiver.get_buoy_pos()
         pass
 
     def boat_state_receiver_cb(self):
