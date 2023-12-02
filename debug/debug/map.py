@@ -6,35 +6,36 @@ from geometry_msgs.msg import PoseArray
 from environment_interfaces.msg import ThreatInfo
 import math
 from environment_interfaces.msg import BoatState
+from environment_interfaces.msg import LidarCluster
 
 base_lat = 48.046300000000  # TODO read it from estimator service
 base_lon = -4.976320000000  # TODO read it from estimator service
 
 def convert_gps_to_xy(latitude, longitude):
-        # Haversine distance calculation
-        R = 6371000  # Earth radius in meters
+    # Haversine distance calculation
+    R = 6371000  # Earth radius in meters
 
-        dLat = math.radians(latitude - base_lat)
-        dLon = math.radians(longitude - base_lon)
-        a = math.sin(dLat / 2) * math.sin(dLat / 2) + math.cos(
-            math.radians(base_lat)
-        ) * math.cos(math.radians(latitude)) * math.sin(dLon / 2) * math.sin(dLon / 2)
-        c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-        distance = R * c
+    dLat = math.radians(latitude - base_lat)
+    dLon = math.radians(longitude - base_lon)
+    a = math.sin(dLat / 2) * math.sin(dLat / 2) + math.cos(
+        math.radians(base_lat)
+    ) * math.cos(math.radians(latitude)) * math.sin(dLon / 2) * math.sin(dLon / 2)
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    distance = R * c
 
-        # Calculate x and y based on the distance and bearing
-        y = math.sin(dLon) * math.cos(math.radians(latitude))
-        x = math.cos(math.radians(base_lat)) * math.sin(
-            math.radians(latitude)
-        ) - math.sin(math.radians(base_lat)) * math.cos(
-            math.radians(latitude)
-        ) * math.cos(
-            dLon
-        )
-        bearing = math.atan2(y, x)
-        y = distance * math.cos(bearing)
-        x = distance * math.sin(bearing)
-        return x, y
+    # Calculate x and y based on the distance and bearing
+    y = math.sin(dLon) * math.cos(math.radians(latitude))
+    x = math.cos(math.radians(base_lat)) * math.sin(
+        math.radians(latitude)
+    ) - math.sin(math.radians(base_lat)) * math.cos(
+        math.radians(latitude)
+    ) * math.cos(
+        dLon
+    )
+    bearing = math.atan2(y, x)
+    y = distance * math.cos(bearing)
+    x = distance * math.sin(bearing)
+    return x, y
 
 class Map(Node):
     def __init__(self):
@@ -62,6 +63,13 @@ class Map(Node):
             BoatState, "/boat/estimator/position", self.usv_pos_cb, 10
         )
 
+        self.debug_lidar_cluster_subscription = self.create_subscription(
+            LidarCluster,
+            "/environment/lidar_debug",
+            self.lidar_cluster_cb,
+            10,
+        )
+
         self.update_map_timer = self.create_timer(
             1,
             self.update_map_timer_cb
@@ -73,8 +81,9 @@ class Map(Node):
         self.threat_pos = Point()
         self.target_pos = Point()
         self.buoy_pos = Point()
+        self.lidar_clusters = []
         self.obstacles = [
-            Obstacles(-120, -50, 25),
+            Obstacles(120, -50, 25),
             Obstacles(-152, -6, 50),
             Obstacles(110, 130, 50),
             Obstacles(12, -102, 25),
@@ -88,27 +97,28 @@ class Map(Node):
 
     def update_map_timer_cb(self):
         self.ax.clear()  # Nettoyer les axes à chaque mise à jour
-        for x, y in self.allies_pos:
-            self.ax.plot(x, y, marker='o', markersize=8, color='green', linestyle='')
+        lidar_clusters = self.lidar_clusters.copy()
+        self.lidar_clusters.clear()
+        for cluster in lidar_clusters:
+                self.ax.plot(cluster[0], cluster[1], marker='o', markersize=3, color='orange', linestyle='') # Lidar clusters in orange
 
-        self.ax.plot(self.threat_pos.x, self.threat_pos.y, marker='o', markersize=8, color='red', linestyle='')
-        self.ax.plot(self.buoy_pos.x, self.buoy_pos.y, marker='o', markersize=8, color='blue', linestyle='')
-        self.ax.plot(self.target_pos.x, self.target_pos.y, marker='o', markersize=8, color='grey', linestyle='')
-        self.ax.plot(self.usv_pos.x, self.usv_pos.y, marker='o', markersize=8, color='purple', linestyle='')
+        for x, y in self.allies_pos:
+            self.ax.plot(x, y, marker='o', markersize=8, color='green', linestyle='') # Allies in green
+
+        self.ax.plot(self.threat_pos.x, self.threat_pos.y, marker='o', markersize=8, color='red', linestyle='') # Threat in red
+        self.ax.plot(self.buoy_pos.x, self.buoy_pos.y, marker='o', markersize=8, color='blue', linestyle='') # Buoy in blue
+        self.ax.plot(self.target_pos.x, self.target_pos.y, marker='o', markersize=8, color='grey', linestyle='') # Target in grey
+        self.ax.plot(self.usv_pos.x, self.usv_pos.y, marker='o', markersize=8, color='purple', linestyle='') # USV in purple
 
         for obstacle in self.obstacles:
-            # Dessiner un cercle
             circle = plt.Circle(
-                (obstacle.x, obstacle.y), obstacle.radius, color="red", fill=False
+                (obstacle.x, obstacle.y), obstacle.radius, color="red", fill=False # Obstacles in red
             )
-            # Ajouter le cercle aux axes
             self.ax.add_patch(circle)
 
-        # Ajuster les limites des axes pour s'assurer que les objets sont entièrement visibles
         self.ax.set_xlim(-300, 300)
         self.ax.set_ylim(-300, 300)
 
-        # Afficher la figure mise à jour
         plt.xlabel('Axe X')
         plt.ylabel('Axe Y')
         plt.title('Mise à jour de la carte')
@@ -140,6 +150,8 @@ class Map(Node):
         self.usv_pos.x = msg.x
         self.usv_pos.y = msg.y
         
+    def lidar_cluster_cb(self, msg: LidarCluster):
+        self.lidar_clusters.append((msg.x, msg.y))
 
 class Obstacles:
     def __init__(self, x, y, radius):
