@@ -168,10 +168,7 @@ class Environment(Node):
         if self.threat_camera.in_is_found is True:
             # Si la caméra voit la menace, on regarde l'angle de la menace vue par la caméra
             for i, cluster in enumerate(lidar_objects):
-                self.get_logger().info(f"cluster : ({cluster.x:.2f};{cluster.y:.2f}) cluster_theta: {math.degrees(cluster.relative_theta):.2f} ; camera_theta {math.degrees(self.threat_camera.in_rel_theta):.2f} + usv_theta {math.degrees(self.usv_theta):.2f} = : {math.degrees(self.threat_camera.in_rel_theta + self.usv_theta):.2f}")
-                # camera_offset = 0
-                # camera_deg = np.unwrap([math.degrees(self.threat_camera.in_rel_theta - self.usv_theta)])
-                # camera_deg = np.unwrap(camera_deg + math.pi/2)
+                # self.get_logger().info(f"cluster : ({cluster.x:.2f};{cluster.y:.2f}) cluster_theta: {math.degrees(cluster.relative_theta):.2f} ; camera_theta {math.degrees(self.threat_camera.in_rel_theta):.2f} + usv_theta {math.degrees(self.usv_theta):.2f} = : {math.degrees(self.threat_camera.in_rel_theta + self.usv_theta):.2f}")
                 if abs(cluster.relative_theta - (self.threat_camera.in_rel_theta + self.usv_theta)) < 0.31: # 0.31 rad ~ 5 % d'erreur
                     self.threat_info.is_found = True
                     (self.threat_info.lon, self.threat_info.lat) = self.convert_gps_to_xy(cluster.x, cluster.y)
