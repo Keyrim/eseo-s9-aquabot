@@ -6,9 +6,7 @@ from rclpy.node import Node
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 from environment_interfaces.msg import ThreatInfo
-from environment_interfaces.msg import BuoyInfo
-from src.shared_types import Source
-
+# from environment_interfaces.msg import BuoyInfo
 
 class CameraFoundElement:
     def __init__(
@@ -33,9 +31,9 @@ class ImageSubscriber():
             self.listener_callback,
             10,
         )
-        self.buoy_position_publisher = self.node.create_publisher(
-            BuoyInfo, "/environment/buoy_position", 10
-        )
+        # self.buoy_position_publisher = self.node.create_publisher(
+        #     BuoyInfo, "/environment/buoy_position", 10
+        # )
         #  Initialiser CvBridge pour convertir les images ROS en images OpenCV
         self.bridge = CvBridge()
         self.fov_deg = 80  # FOV de la caméra
@@ -105,23 +103,23 @@ class ImageSubscriber():
                 )
                 else threat_element
             )
-            cv2.drawContours(image, [element.contour], -1, (0, 255, 0), 2)
-            cv2.circle(image, (element.x, element.y), 3, (255, 255, 255), -1)
+            # cv2.drawContours(image, [element.contour], -1, (0, 255, 0), 2)
+            # cv2.circle(image, (element.x, element.y), 3, (255, 255, 255), -1)
             # cv2.putText(image, f"center : ({element.x};{element.y};{element.angle}°)", (element.x - 20, element.y - 20),
             #     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2) # DEBUG
 
-        if threat_element.area > 0:
-            cv2.circle(image, (threat_element.x, threat_element.y), 3, (0, 0, 255), -1)
-            cv2.putText(
-                image,
+        # if threat_element.area > 0:
+            # cv2.circle(image, (threat_element.x, threat_element.y), 3, (0, 0, 255), -1)
+            # cv2.putText(
+                # image,
                 # f"area : {threat_element.area} (X;Y) : ({threat_element.x};{threat_element.y}) theta_deg {threat_element.angle:.2f})", # DEBUG
-                f"theta_threat [-40;40 deg] {threat_element.angle:.2f}",
-                (threat_element.x - 70, threat_element.y - 20),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.3,
-                (0, 0, 255),
-                2,
-            )
+                # f"theta_threat [-40;40 deg] {threat_element.angle:.2f}",
+                # (threat_element.x - 70, threat_element.y - 20),
+                # cv2.FONT_HERSHEY_SIMPLEX,
+                # 0.3,
+                # (0, 0, 255),
+                # 2,
+            # )
 
         is_threat_found = threat_element.area > 0  # True si la menace est trouvée
         # Publier la menace si visible ou si on vient de la perdue de vue
@@ -135,12 +133,12 @@ class ImageSubscriber():
                 )
             self.is_threat_found = is_threat_found
             self.threat_theta = math.radians(threat_element.angle)
-            self.threat_image = image
+            # self.threat_image = image
             self.node.image_listener_threat_cb()
 
         # Afficher l'image
-        cv2.imshow("Threat tracker CAMERA", image)
-        cv2.waitKey(1)
+        # cv2.imshow("Threat tracker CAMERA", image)
+        # cv2.waitKey(1)
 
     # def buoy_tracker(self, msg: Image):
     #     y_buoy_threshold = 170
@@ -236,4 +234,4 @@ class ImageSubscriber():
         elif self.rx_counter == 2:
             pass
         #     self.buoy_tracker(msg)
-        self.rx_counter = (self.rx_counter + 1) % 4
+        self.rx_counter = (self.rx_counter + 1) % 2
