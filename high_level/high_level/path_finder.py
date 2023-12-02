@@ -1,13 +1,32 @@
 import heapq
 from matplotlib import pyplot as plt
 
+KEEPOUT_RADIUS = 15
+
+def get_obstacles():
+    obstacles = [
+        [120, -50, 25 + KEEPOUT_RADIUS],
+        [-152, -6, 50 + KEEPOUT_RADIUS],
+        [110, 130, 50 + KEEPOUT_RADIUS],
+        [12, -102, 25 + KEEPOUT_RADIUS],
+        [92, 170, 25 + KEEPOUT_RADIUS],
+        [-92, 176, 30 + KEEPOUT_RADIUS],
+        [-40, 220, 30 + KEEPOUT_RADIUS],
+        [-44, -95, 30 + KEEPOUT_RADIUS],
+        [-30, -150, 30 + KEEPOUT_RADIUS],
+    ]
+    return obstacles
+
 class PathFinder:
 
     GRID_SIZE = 20
 
     def __init__(self, fix_obstacles = []):
         self.current_pos = (0, 0)
-        self.fix_obstacles = fix_obstacles  # List of obstacles, each represented as (x, y, radius)
+        self.fix_obstacles = []  # List of obstacles, each represented as (x, y, radius)
+        if len(fix_obstacles) != 0:
+            self.add_list_fix_obstacle(fix_obstacles)
+
         self.moveable_obstacles = []  # List of obstacles, each represented as (x, y, radius)
 
     def set_position(self, x, y):
@@ -26,7 +45,7 @@ class PathFinder:
         """Add an obstacle represented by its center (x, y) and radius."""
         x = x // self.GRID_SIZE
         y = y // self.GRID_SIZE
-        radius = radius // self.GRID_SIZE
+        radius = (radius // self.GRID_SIZE)
         self.moveable_obstacles.append((x, y, radius))
 
     def delete_all_moveable_obstacle(self):
@@ -34,13 +53,13 @@ class PathFinder:
 
     def add_list_fix_obstacle(self, list_obstacle):
         for obstacle in list_obstacle:
-            self.add_fix_obstacle(obstacle.x, obstacle.y, obstacle.radius)
+            self.add_fix_obstacle(obstacle[0], obstacle[1], obstacle[2])
 
     def add_fix_obstacle(self, x, y, radius):
         """Add an obstacle represented by its center (x, y) and radius."""
         x = x // self.GRID_SIZE
         y = y // self.GRID_SIZE
-        radius = radius // self.GRID_SIZE
+        radius = (radius // self.GRID_SIZE)
         self.fix_obstacles.append((x, y, radius))
 
     def find_path(self, target_pos):
@@ -114,14 +133,22 @@ class AStar:
         return []  # Path not found
 
 # Example usage
+window_size = 300
 if __name__ == '__main__':
-    path_finder = PathFinder()
+    path_finder = PathFinder(get_obstacles())
     path_finder.set_position(0, 0)  # Set current position
-    path_finder.add_fix_obstacle(200, 200, 300)  # Add an obstacle
-    path_finder.add_fix_obstacle(300, 600, 300)  # Add an obstacle
-    path = path_finder.find_path((600, 600))  # Find path to the target
+    path = path_finder.find_path((-200, -5))
     # Plot the path
-    print(path[0])
-    plt.plot([x for x, y in path], [y for x, y in path])
+    if len(path) != 0:
+        print(path[0])
+        plt.plot([x for x, y in path], [y for x, y in path])
+    # Plot the obstacles
+    for x, y, radius in get_obstacles():
+        circle = plt.Circle((x, y), radius, color='r')
+        plt.gcf().gca().add_artist(circle)
+    # Set the axis limits
+    plt.xlim(-window_size, window_size)
+    plt.ylim(-window_size, window_size)
+
     plt.show()
 
