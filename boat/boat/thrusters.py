@@ -4,7 +4,8 @@ from std_msgs.msg import Float64
 WAMV_TOPIC_THRUSTERS_POS = '/wamv/thrusters/main/pos'
 WAMV_TOPIC_THRUSTERS_THRUST = '/wamv/thrusters/main/thrust'
 
-MAX_POS = 1.5 # amplitude max du signal de commande (rad)
+MAX_POS = math.pi/4 # amplitude max du signal de commande (rad)
+MAX_THRUST = 12000  # amplitude max du signal de commande (tr/min)
 
 class ThrustersPublisher:
     def __init__(self, node):
@@ -27,9 +28,6 @@ class ThrustersPublisher:
             real_pos = -MAX_POS
         msg.data = float(real_pos)
         self.publisher_pos.publish(msg)
-        # Log thrust AND pos
-        # self.node.get_logger().info('Thrust: "%f" Pos: "%f"' % (self.thrust, self.pos))
-
 
     def command(self, thrust, torque):
         self.u_torque = torque

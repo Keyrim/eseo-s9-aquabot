@@ -5,6 +5,7 @@ from high_level.buoy import BuoyReceiver
 from high_level.path_finder import PathFinder
 from boat.boat_state import BoatStateReceiver
 from boat.trajectory import TrajectoryPublisher
+from boat.controller_mode import ControllerModePublisher, ControllerMode
 from high_level.obstacle import get_obstacles
 
 
@@ -12,6 +13,7 @@ class HighLevel(Node):
     def __init__(self):
         super().__init__('high_level_node')
         self.trajectory_publisher = TrajectoryPublisher(self)
+        self.controller_mode_publisher = ControllerModePublisher(self)
         self.state_tracker_receiver = StateTrackerReceiver(self)
         self.buoy_receiver = BuoyReceiver(self)
         self.boat_state = BoatStateReceiver(self)
@@ -44,6 +46,7 @@ class HighLevel(Node):
     def init(self):
         if self.buoy_received and self.pos_received:
             self.set_phase(Phase.BUOY)
+            self.controller_mode_publisher.publish(ControllerMode.ENABLED)
         pass
 
     def buoy(self):
