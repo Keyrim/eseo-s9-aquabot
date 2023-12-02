@@ -56,7 +56,7 @@ class Environment(Node):
             "/vrx/patrolandfollow/alert_position",
             10
         )
-        # self.debug_lidar_publisher = self.create_publisher(
+        # self.debug_lidar_publisher = self.create_publisher( # DEBUG
         #     LidarCluster,
         #     "/environment/lidar_debug",
         #     10
@@ -70,9 +70,6 @@ class Environment(Node):
         self.exact_threat_pos_subscriber = ExactThreatPositionSubscriber(self)
         self.state_tracker_receiver = StateTrackerReceiver(self)
         # Class attributes
-        # CONSTANTS
-        self.base_lat = 48.046300000000
-        self.base_lon = -4.976320000000
         self.keepout_radius = 15
         self.obstacles = [
             Obstacles(-157, 0, 35 + self.keepout_radius),
@@ -332,19 +329,19 @@ class Environment(Node):
         # Haversine distance calculation
         R = 6371000  # Earth radius in meters
 
-        dLat = math.radians(latitude - self.base_lat)
-        dLon = math.radians(longitude - self.base_lon)
+        dLat = math.radians(latitude - self.boat_state_receiver.base_lat)
+        dLon = math.radians(longitude - self.boat_state_receiver.base_lon)
         a = math.sin(dLat / 2) * math.sin(dLat / 2) + math.cos(
-            math.radians(self.base_lat)
+            math.radians(self.boat_state_receiver.base_lat)
         ) * math.cos(math.radians(latitude)) * math.sin(dLon / 2) * math.sin(dLon / 2)
         c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
         distance = R * c
 
         # Calculate x and y based on the distance and bearing
         y = math.sin(dLon) * math.cos(math.radians(latitude))
-        x = math.cos(math.radians(self.base_lat)) * math.sin(
+        x = math.cos(math.radians(self.boat_state_receiver.base_lat)) * math.sin(
             math.radians(latitude)
-        ) - math.sin(math.radians(self.base_lat)) * math.cos(
+        ) - math.sin(math.radians(self.boat_state_receiver.base_lat)) * math.cos(
             math.radians(latitude)
         ) * math.cos(
             dLon
@@ -356,8 +353,8 @@ class Environment(Node):
 
     def convert_xy_to_gps(self, x, y):
         R = 6371000  # Rayon de la Terre en mètres
-        base_lat_radians = math.radians(self.base_lat)
-        base_lon_radians = math.radians(self.base_lon)
+        base_lat_radians = math.radians(self.boat_state_receiver.base_lat)
+        base_lon_radians = math.radians(self.boat_state_receiver.base_lon)
 
         distance = math.sqrt(x**2 + y**2)
         bearing = math.atan2(y, x)
