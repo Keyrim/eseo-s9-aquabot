@@ -13,7 +13,7 @@ def get_obstacles():
         [90, 150, 35 + KEEPOUT_RADIUS],
         [100, 170, 35 + KEEPOUT_RADIUS],
         [110, 150, 30 + KEEPOUT_RADIUS],
-        
+
         [120, -50, 25 + KEEPOUT_RADIUS],
         [12, -102, 25 + KEEPOUT_RADIUS],
         [-92, 176, 30 + KEEPOUT_RADIUS],
@@ -25,7 +25,7 @@ def get_obstacles():
 
 class PathFinder:
 
-    GRID_SIZE = 2
+    GRID_SIZE = 20
 
     def __init__(self, fix_obstacles = []):
         self.current_pos = (0, 0)

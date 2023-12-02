@@ -17,8 +17,8 @@ PLOT_GRAPH_PERIOD_S = 0.1
 class HighLevel(Node):
     def __init__(self):
         super().__init__('high_level_node')
-        self.trajectory_publisher = TrajectoryPublisher(self)
-        self.controller_mode_publisher = ControllerModePublisher(self)
+        self.trajectory_publisher:  TrajectoryPublisher = TrajectoryPublisher(self)
+        self.controller_mode_publisher: ControllerModePublisher = ControllerModePublisher(self)
         self.state_tracker_receiver = StateTrackerReceiver(self)
         self.buoy_receiver = BuoyReceiver(self)
         self.boat_state = BoatStateReceiver(self)
@@ -43,6 +43,7 @@ class HighLevel(Node):
         # Logic flags
         self.buoy_received = False
         self.pos_received = False
+        self.buoy_reached = False
 
     def set_phase(self, phase: Phase):
         #Log new current phase
@@ -69,6 +70,9 @@ class HighLevel(Node):
         pass
 
     def buoy(self):
+        if self.buoy_reached:
+            self.set_phase(Phase.PATROL)
+            return
         # Get variables
         boat_x, boat_y = self.boat_state.get_pos()
         buoy_x, buoy_y = self.last_valid_buoy_pos
@@ -76,6 +80,8 @@ class HighLevel(Node):
         self.path_finder.set_position(boat_x, boat_y)
         # TODO add moving obstacles
         # Compute path
+        # Log "searching path"
+        self.get_logger().info('Searching path...')
         path = self.path_finder.find_path((buoy_x, buoy_y))
         # no path found
         if len(path) == 0:
@@ -89,8 +95,9 @@ class HighLevel(Node):
             self.get_logger().info('Target reached')
             if PLOT_GRAPH:
                 self.graph_plotter.set_points([(0, 0)])
-            self.trajectory_publisher.publish(buoy_x, buoy_y)
+            self.trajectory_publisher.publish(buoy_x, buoy_y, full_speed=False)
         else :
+            self.get_logger().info('Path found')
             if PLOT_GRAPH:
                 self.graph_plotter.set_points(path)
             # Save the path for the buoyz
@@ -102,17 +109,24 @@ class HighLevel(Node):
         if len(self.buoy_path) == 0:
             self.get_logger().error('No path found')
             return
-        self.trajectory_publisher.publish(self.buoy_path[1][0], self.buoy_path[1][1])
+        # Log x y target
+        self.get_logger().info('Target: %f %f' % (self.buoy_path[1][0], self.buoy_path[1][1]))
+        self.trajectory_publisher.publish(self.buoy_path[1][0], self.buoy_path[1][1], full_speed=True)
 
     def patrol(self):
+        self.controller_mode_publisher.publish(ControllerMode.DISABLED)
         pass
 
     def pursuit(self):
         pass
 
     def state_tracker_cb(self):
-        # Must be provided
-        pass
+        self.get_logger().info('State received: %s' % self.state_tracker_receiver.get_phase().name)
+        if self.phase == Phase.BUOY:
+            self.get_logger().info('Buoy reached')
+            if (self.state_tracker_receiver.get_phase() == Phase.PATROL
+                or self.state_tracker_receiver.get_phase() == Phase.PURSUIT):
+                self.buoy_reached = True
 
     def buoy_receiver_cb(self):
         if self.path_finder.check_if_target_valid(self.buoy_receiver.get_buoy_pos()):

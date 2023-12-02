@@ -11,13 +11,14 @@ from boat.vector_2d_plotter import Vector2DPlotter
 KP_THRUST = 200
 KI_THRUST = 0
 KD_THRUST = 0
+MAX_THRUST = 10000
 
 KP_TORQUE = 130
 KI_TORQUE = 0
 KD_TORQUE = 0
 
 # Configuration
-MIN_DISTANCE = 10 # Pas d'asservissement si la distance entre la cible et le bateau est inférieure à MIN_DISTANCE
+MIN_DISTANCE = 2 # Pas d'asservissement si la distance entre la cible et le bateau est inférieure à MIN_DISTANCE
 THROTLE_FOR_REVERSE = 2000
 PLOT_COMMAND_VECTOR = False # Affiche le vecteur de commande en live (sans bloquer l'exécution)
 
@@ -26,7 +27,7 @@ class Controller(Node):
         super().__init__('controller_node')
         self.input_handler = InputHandler(self)
         self.thrusters = ThrustersPublisher(self)
-        self.pid_d = PidController(KP_THRUST, KI_THRUST, KD_THRUST, 8000)
+        self.pid_d = PidController(KP_THRUST, KI_THRUST, KD_THRUST, MAX_THRUST)
         self.pid_torque = PidController(KP_TORQUE, KI_TORQUE, KD_TORQUE)
         self.controller_mode_publisher = ControllerModeReceiver(self)
         self.timer = self.create_timer(0.001, self.main)
@@ -57,15 +58,19 @@ class Controller(Node):
 
     def compute_command(self):
         # Compute the pids output
-        self.pid_d.compute(self.input_handler.e_d, 0.1)
+        # if we are in full speed mode, we don't use the distance pid, we just go full speed
+        if self.input_handler.trajectory_receiver.full_speed:
+            self.pid_d.u = MAX_THRUST
+        else:
+            self.pid_d.compute(self.input_handler.e_d, 0.1)
         self.pid_torque.compute(self.input_handler.e_theta, 0.1)
         # Adapt the distance control signal regarding the angle error
         self.pid_d.u *= math.cos(self.input_handler.e_theta)
         if self.pid_d.u < 0:
             self.pid_d.u = THROTLE_FOR_REVERSE
         # log error and control signal and real e d with 2 decimals
-        self.get_logger().info('e_d: "%f" e_theta: "%f" u_d: "%f" u_theta: "%f"' % (
-            self.input_handler.e_d, self.input_handler.e_theta, self.pid_d.u, self.pid_torque.u))
+        # self.get_logger().info('e_d: "%f" e_theta: "%f" u_d: "%f" u_theta: "%f"' % (
+        #     self.input_handler.e_d, self.input_handler.e_theta, self.pid_d.u, self.pid_torque.u))
         if PLOT_COMMAND_VECTOR:
             self.command_ploter.update_vector(0, self.pid_torque.u, self.pid_d.u)
 
@@ -74,9 +79,10 @@ class Controller(Node):
         if not self.working:
             self.control(0, 0)
             return
-        # If we are too close to the target, we do nothing
+        # If we are too close to the target, we just try to stop
         if self.input_handler.e_d < MIN_DISTANCE:
-            self.control(0, 0)
+            thrust = 10 * self.input_handler.boat_state_receiver.get_speed()
+            self.control(thrust, 0)
             return
         # Compute the control signal
         self.compute_command()

@@ -1,4 +1,4 @@
-from std_msgs.msg import Int64
+from std_msgs.msg import UInt32
 from enum import Enum
 
 
@@ -17,9 +17,12 @@ class StateTrackerReceiver:
         self.node = node
         self.phase = Phase.INIT
         self.subscription = node.create_subscription(
-            Int64, TOPIC_CURRENT_STATE, self.callback, 10)
+            UInt32, TOPIC_CURRENT_STATE, self.callback, 10)
 
     def callback(self, msg):
         self.phase = Phase(msg.data)
         # Publish the state of the boat
         self.node.state_tracker_cb()
+
+    def get_phase(self):
+        return self.phase

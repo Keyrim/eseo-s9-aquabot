@@ -14,7 +14,7 @@ class BoatStateReceiver:
         self.subscription = node.create_subscription(
             BoatState, TOPIC_BOAT_STATE, self.callback, 10)
 
-    def getSpeed(self):
+    def get_speed(self):
         return math.sqrt(self.vx**2 + self.vy**2)
 
     def callback(self, msg):
