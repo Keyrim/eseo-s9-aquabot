@@ -10,7 +10,10 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
-        ('share/' + package_name + '/launch', ['launch/launch_all.launch.py']),
+        ('share/' + package_name + '/launch', [
+            'launch/launch_all.launch.py',
+            'launch/estimator_controller.launch.py'
+        ]),
         # Add more launch files here if you have them
     ],
 
