@@ -1,4 +1,5 @@
 import rclpy
+import math
 from rclpy.node import Node
 from high_level.state_tracker import StateTrackerReceiver, Phase
 from high_level.buoy import BuoyReceiver
@@ -8,11 +9,14 @@ from boat.trajectory import TrajectoryPublisher
 from boat.controller_mode import ControllerModePublisher, ControllerMode
 from high_level.obstacle import get_obstacles
 from high_level.graph_plotter import GraphPlotter
+from high_level.threat_info import ThreatInfoReceiver
 
 
 PLOT_GRAPH = False
 PLOT_GRAPH_PERIOD_S = 0.1
 
+THREAT_CLOSE_DISTANCE = 40 # Distance à laquelle on considère que le bateau est proche de la menace
+BOY_CLOSE_DISTANCE = 10 # Distance à laquelle on considère que le bateau a atteint la bouée
 
 class HighLevel(Node):
     def __init__(self):
@@ -21,6 +25,7 @@ class HighLevel(Node):
         self.controller_mode_publisher: ControllerModePublisher = ControllerModePublisher(self)
         self.state_tracker_receiver = StateTrackerReceiver(self)
         self.buoy_receiver = BuoyReceiver(self)
+        self.threat_info_receiver = ThreatInfoReceiver(self)
         self.boat_state = BoatStateReceiver(self)
         self.path_finder = PathFinder(get_obstacles())
         self.timer = self.create_timer(0.5, self.main)
@@ -29,6 +34,8 @@ class HighLevel(Node):
         self.last_valid_buoy_pos = (0, 0)
         self.buoy_is_valid_graph = False
         self.buoy_path = []
+
+        self.target_path = []
 
         if PLOT_GRAPH:
             self.graph_plotter = GraphPlotter()
@@ -44,6 +51,8 @@ class HighLevel(Node):
         self.buoy_received = False
         self.pos_received = False
         self.buoy_reached = False
+
+        self.target_is_position_known = False
 
     def set_phase(self, phase: Phase):
         #Log new current phase
@@ -76,6 +85,13 @@ class HighLevel(Node):
         # Get variables
         boat_x, boat_y = self.boat_state.get_pos()
         buoy_x, buoy_y = self.last_valid_buoy_pos
+        # Check if we are close enough
+        distance = math.sqrt((buoy_x - boat_x)**2 + (buoy_y - boat_y)**2)
+        if distance < BOY_CLOSE_DISTANCE:
+            self.get_logger().info('Buoy reached')
+            self.buoy_reached = True
+            self.set_phase(Phase.PATROL)
+            return
         # Config path finder
         self.path_finder.set_position(boat_x, boat_y)
         # TODO add moving obstacles
@@ -106,6 +122,7 @@ class HighLevel(Node):
             self.publish_target_from_buoy_path()
 
     def publish_target_from_buoy_path(self):
+
         if len(self.buoy_path) == 0:
             self.get_logger().error('No path found')
             return
@@ -115,9 +132,57 @@ class HighLevel(Node):
 
     def patrol(self):
         self.controller_mode_publisher.publish(ControllerMode.DISABLED)
+        if self.target_is_position_known:
+            self.set_phase(Phase.PURSUIT)
         pass
 
     def pursuit(self):
+        # Are we close to the target?
+        target_x, target_y = self.threat_info_receiver.get_pos()
+        boat_x, boat_y = self.boat_state.get_pos()
+        distance = math.sqrt((target_x - boat_x)**2 + (target_y - boat_y)**2)
+        if distance < THREAT_CLOSE_DISTANCE:
+            self.pursuit_close()
+        else:
+            self.pursuit_far()
+
+    def pursuit_far(self):
+        target_x, target_y = self.threat_info_receiver.get_pos()
+        boat_x, boat_y = self.boat_state.get_pos()
+        # use astar
+        self.path_finder.set_position(boat_x, boat_y)
+        # TODO add moving obstacles
+        # Compute path
+        # Log "searching path"
+        self.get_logger().info('Searching path...')
+        path = self.path_finder.find_path((target_x, target_y))
+        # no path found
+        if len(path) == 0:
+            self.get_logger().error('No path found')
+            if len(self.target_path):
+                pass
+        elif len(path) == 1:
+            self.get_logger().info('Target reached')
+            self.trajectory_publisher.publish(target_x, target_y, full_speed=False)
+        else :
+            self.get_logger().info('Path found')
+            # Save the path for the target
+            self.target_path = path
+            self.publish_target_from_target_path()
+        pass
+
+    def publish_target_from_target_path(self):
+        if len(self.target_path) == 0:
+            self.get_logger().error('No path found')
+            return
+        # Log x y target
+        self.get_logger().info('Target: %f %f' % (self.target_path[1][0], self.target_path[1][1]))
+        self.trajectory_publisher.publish(self.target_path[1][0], self.target_path[1][1], full_speed=True)
+    def pursuit_close(self):
+        pass
+
+    def threat_info_cb(self):
+        # must be implemented
         pass
 
     def state_tracker_cb(self):
@@ -127,6 +192,9 @@ class HighLevel(Node):
             if (self.state_tracker_receiver.get_phase() == Phase.PATROL
                 or self.state_tracker_receiver.get_phase() == Phase.PURSUIT):
                 self.buoy_reached = True
+        elif self.phase == Phase.PATROL:
+            if self.state_tracker_receiver.get_phase() == Phase.PURSUIT:
+                self.target_is_position_known = True
 
     def buoy_receiver_cb(self):
         if self.path_finder.check_if_target_valid(self.buoy_receiver.get_buoy_pos()):
