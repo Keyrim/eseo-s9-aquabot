@@ -98,3 +98,13 @@ The following command will launch the simulation with a simple world.
 ```bash
 ros2 launch aquabot_gz competition.launch.py world:=aquabot_regatta
 ```
+
+### 3 Example inline plantuml
+
+```plantuml
+@startuml
+
+Bob --> Alice
+
+@enduml
+```
